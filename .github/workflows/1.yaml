@@ -10,7 +10,7 @@ on:
 
     
 jobs:
-  baidu_to_cos:
+  diy_push:
     runs-on: ubuntu-latest
 
     steps:
@@ -25,7 +25,7 @@ jobs:
     - name: Install dependencies
       run: pip install -r requirements.txt
 
-    - name: Upload to Tencent COS
+    - name: diy push
       env:
         BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
         CHAT_ID: ${{ secrets.CHAT_ID }}
