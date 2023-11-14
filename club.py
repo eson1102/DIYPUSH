@@ -1,7 +1,7 @@
 import requests
 from bs4 import BeautifulSoup
 import time
-
+import os
 
 bot_token=os.environ["BOT_TOKEN"]
 chat_id=os.environ["CHAT_ID"]
