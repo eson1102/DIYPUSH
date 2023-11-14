@@ -3,9 +3,9 @@ from bs4 import BeautifulSoup
 import time
 
 
-bot_token='6676903379:AAGjF8oK3uUd03rqhwQM1xwO151Emv74zuM'
-chat_id='507265893'
-qywechat='fc52ec93-b058-4e96-9991-598f6cdf803b'
+bot_token=os.environ["BOT_TOKEN"]
+chat_id=os.environ["CHAT_ID"]
+qywechat=os.environ["QYWECHAT_ID"]
 
 url = 'https://clubbingbuy.net/threads/nesco-mt5.11471/'
 
