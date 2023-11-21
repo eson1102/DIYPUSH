@@ -19,10 +19,10 @@ for index, row in df.iterrows():
     day_value = row['日']
 
     # 计算剩余天数
-    remaining_days = (current_date.day - day_value)
+    remaining_days = (day_value - current_date.day)
 
     # 如果剩余天数在1到5之间，进行提醒
-    if -1 < remaining_days > -5:
+    if 1 < remaining_days < 5:
         # 输出其他列的内容，并用换行分隔
         output_str = (
             f"剩余天数: {remaining_days}\n"
