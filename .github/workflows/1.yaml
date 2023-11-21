@@ -33,3 +33,4 @@ jobs:
       run: 
         # 运行上传脚本
         python club.py
+        python fxwiki.py
