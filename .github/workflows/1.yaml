@@ -5,10 +5,8 @@ on:
     branches:
       - main
   schedule:
-    # * is a special character in YAML so you have to quote this string
-    - cron: '0 */2 * * *' # Run every hour
+    - cron: '0 */2 * * *' # Run every 2 hours
 
-    
 jobs:
   diy_push:
     runs-on: ubuntu-latest
@@ -20,17 +18,17 @@ jobs:
     - name: Set up Python
       uses: actions/setup-python@v2
       with:
-        python-version: 3.9 # 替换为所需的Python版本
+        python-version: 3.9
 
     - name: Install dependencies
       run: pip install -r requirements.txt
 
-    - name: diy push
+    - name: Run Python Scripts
       env:
         BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
         CHAT_ID: ${{ secrets.CHAT_ID }}
         QYWECHAT_ID: ${{ secrets.QYWECHAT_ID }}
       run: 
-        # 运行上传脚本
-        python club.py
-        python fxwiki.py
+        |-
+          python club.py &&
+          python fxwiki.py
