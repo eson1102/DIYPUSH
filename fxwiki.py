@@ -29,7 +29,7 @@ for index, row in df.iterrows():
             f"到期日: {day_value}\n"
             f"===================\n"
             f"序号: {row['序号']}\n"
-            f"ip: {row['ip']}\n"
+            f"ip: {row['ip尾号']}\n"
             f"邮箱: {row['邮箱']}\n"
             f"地区: {row['地区']}\n"
             # 添加其他列信息...
