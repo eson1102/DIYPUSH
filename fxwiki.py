@@ -1,6 +1,7 @@
 import pandas as pd
 from datetime import datetime
 import requests
+import os
 
 bot_token=os.environ["BOT_TOKEN"]
 chat_id=os.environ["CHAT_ID"]
