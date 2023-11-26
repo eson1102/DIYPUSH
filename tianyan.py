@@ -3,6 +3,7 @@ from bs4 import BeautifulSoup
 from datetime import datetime, timedelta
 import re
 import os
+import time
 
 def get_page_content(url, cookies):
     try:
@@ -238,7 +239,7 @@ def main():
 
                         print(reminder_message)
                         r = requests.post(f'https://api.telegram.org/bot{telegram_token}/sendMessage', json={"chat_id": telegram_chat_id, "text": reminder_message})
-
+                        timme.sleep(2)
                 else:
                     print("未找到匹配的日期")
                     r = requests.post(f'https://api.telegram.org/bot{telegram_token}/sendMessage', json={"chat_id": telegram_chat_id, "text": f"未找到匹配的日期，账号: {account_name}"})
@@ -249,7 +250,7 @@ def main():
 
         except Exception as e:
             print(f"在处理账号 {account_name} 时发生错误: {e}")
-            r = requests.post(f'https://api.telegram.org/bot{telegram_token}/sendMessage', json={"chat_id": telegram_chat_id, "text": f"在处理账号 {account_name} 时发生错误: {e}"})
+            r = requests.post(f'https://api.telegram.org/bot{telegram_token}/sendMessage', json={"chat_id": telegram_chat_id, "text": f"在处理账号 {account_name} 时发生错误,疑似天眼云主机被删除，错误: {e}"})
             continue  # Continue to the next iteration even if an error occurs
 
 if __name__ == "__main__":
