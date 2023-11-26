@@ -225,7 +225,7 @@ def main():
                     current_datetime = datetime.now()
                     days_until_expiration = (expiration_datetime - current_datetime).days
 
-                    if 1 < days_until_expiration < 17:
+                    if 1 < days_until_expiration < 7:
                         reminder_message = (
                             f"提醒：到期时间还有 {days_until_expiration} 天\n"
                             f"===================\n"
