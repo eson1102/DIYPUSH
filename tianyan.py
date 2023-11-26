@@ -200,6 +200,7 @@ def main():
             user_email = user_center_soup.find('div', class_='portrait-emit').text.strip()
 
             print("\n用户信息:")
+            print(f"账号: {account_name}")
             print(f"邮箱: {user_email}")
             print("===================")
         else:
@@ -230,6 +231,7 @@ def main():
                         reminder_message = (
                             f"提醒：到期时间还有 {days_until_expiration} 天\n"
                             f"===================\n"
+                            f"账号 {account_name}\n"
                             f"邮箱 {user_email}\n"
                             f"===================\n"
                             f"VPS信息\n"
