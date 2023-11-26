@@ -239,7 +239,7 @@ def main():
 
                         print(reminder_message)
                         r = requests.post(f'https://api.telegram.org/bot{telegram_token}/sendMessage', json={"chat_id": telegram_chat_id, "text": reminder_message})
-                        timme.sleep(5)
+                        time.sleep(5)
                 else:
                     print("未找到匹配的日期")
                     r = requests.post(f'https://api.telegram.org/bot{telegram_token}/sendMessage', json={"chat_id": telegram_chat_id, "text": f"未找到匹配的日期，账号: {account_name}"})
