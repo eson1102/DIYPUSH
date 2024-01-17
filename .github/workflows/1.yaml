@@ -30,5 +30,4 @@ jobs:
         QYWECHAT_ID: ${{ secrets.QYWECHAT_ID }}
       run: 
         |-
-          #python club.py &&
-          #python tianyan.py
+          python clashupdate.py
