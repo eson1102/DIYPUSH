@@ -28,6 +28,10 @@ jobs:
         BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
         CHAT_ID: ${{ secrets.CHAT_ID }}
         QYWECHAT_ID: ${{ secrets.QYWECHAT_ID }}
+        SECRET_ID: ${{ secrets.SECRET_ID }}
+        SECRET_KEY: ${{ secrets.SECRET_KEY }}
+        REGION: ${{ secrets.REGION }}
+        BUCKET: ${{ secrets.BUCKET }}
       run: 
         |-
           python clashupdate.py
