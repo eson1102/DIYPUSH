@@ -11,7 +11,7 @@ telegram_token = os.environ["BOT_TOKEN"]
 telegram_chat_id = os.environ["CHAT_ID"]
 
 # 使用请求库获取ini文件的内容
-response = requests.get("https://api.v1.mk/sub?target=clash&url=https%3A%2F%2Fxsus.cloud%2Fapi%2Fv1%2Fclient%2Fsubscribe%3Ftoken%3D171df0a5b826b4854458f6a32d586549%7Chttps%3A%2F%2Fservice-2yo94l6s-1323819695.gz.tencentapigw.com.cn%2Fapi%2Fv1%2Fclient%2Fsubscribe%3Ftoken%3Dea16d8b2c8a3d1a4a1182edc19d19571&insert=false&config=https%3A%2F%2Fraw.githubusercontent.com%2FACL4SSR%2FACL4SSR%2Fmaster%2FClash%2Fconfig%2FACL4SSR_Online_Full_NoAuto.ini&emoji=true&list=false&xudp=false&udp=true&tfo=false&expand=true&scv=false&fdn=true&clash.doh=true&new_name=true",timeout=20)
+response = requests.get("https://api.v1.mk/sub?target=clash&url=https%3A%2F%2Fxsus.cloud%2Fapi%2Fv1%2Fclient%2Fsubscribe%3Ftoken%3D171df0a5b826b4854458f6a32d586549%7Chttps%3A%2F%2Fservice-2yo94l6s-1323819695.gz.tencentapigw.com.cn%2Fapi%2Fv1%2Fclient%2Fsubscribe%3Ftoken%3Dea16d8b2c8a3d1a4a1182edc19d19571&insert=false&config=https%3A%2F%2Fraw.githubusercontent.com%2FACL4SSR%2FACL4SSR%2Fmaster%2FClash%2Fconfig%2FACL4SSR_Online_Full_NoAuto.ini&emoji=true&list=false&xudp=false&udp=true&tfo=false&expand=true&scv=false&fdn=true&clash.doh=true&new_name=true",timeout=20,20)
 file_content = response.content
 
 # 腾讯云COS的配置和客户端初始化
