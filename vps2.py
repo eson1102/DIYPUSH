@@ -45,14 +45,13 @@ for index, (account, info) in enumerate(accounts.items(), start=1):
                     days_remaining = (expiry_date - current_date).days
                     if days_remaining < 5:
                         message += f"{label}: {value} (即将到期！剩余时间小于5天，还剩 {days_remaining} 天)\n"
-                        time.sleep(2)
+                        
                     else:
                         message += f"{label}: {value} (还剩 {days_remaining} 天)\n"
-                        time.sleep(2)
+                       
                 else:
                     message += f"{label}: {value}\n"
-                    time.sleep(2)
-
+                    
         r = requests.post(f'https://api.telegram.org/bot{bot_token}/sendMessage', json={"chat_id": chat_id, "text": message})
 
     except requests.RequestException as e:
