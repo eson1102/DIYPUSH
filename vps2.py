@@ -22,8 +22,8 @@ url = 'https://vps.wikifx.com/zh-cn/jyzh'
 # 遍历多个账号
 for index, (account, info) in enumerate(accounts.items(), start=1):
     cookies = {'DJkdikKMG': info['cookie']}
-    print(f"\n帐号 {index}: {info['name']}")
-    
+    message = f"\n帐号 {index}: {info['name']}\n"
+
     try:
         r = requests.get(url, cookies=cookies)
         r.raise_for_status()
@@ -34,9 +34,6 @@ for index, (account, info) in enumerate(accounts.items(), start=1):
         current_date = datetime.now()
 
         key_labels = ["VPS IP", "到期日期", "近1月实盘交易数量"]
-    
-        # 添加一个计数器变量
-        item_counter = 1
 
         for item in information_items:
             label = item.find('div', class_='information-list-item-left').text.strip()
@@ -45,19 +42,18 @@ for index, (account, info) in enumerate(accounts.items(), start=1):
             if label in key_labels:
                 if label == "到期日期":
                     expiry_date = datetime.strptime(value, '%Y-%m-%d')
-                    if expiry_date < current_date + timedelta(days=5):
-                        message=(f"{label}: {value} (即将到期！剩余时间小于5天)")
-                        r = requests.post(f'https://api.telegram.org/bot{bot_token}/sendMessage', json={"chat_id": chat_id, "text": message})
-                        print('Telegram通知消息已发送')
+                    days_remaining = (expiry_date - current_date).days
+                    if days_remaining < 5:
+                        message += f"{label}: {value} (即将到期！剩余时间小于5天，还剩 {days_remaining} 天)\n"
+                        time.sleep(2)
                     else:
-                        message=(f"{label}: {value}")
-                        r = requests.post(f'https://api.telegram.org/bot{bot_token}/sendMessage', json={"chat_id": chat_id, "text": message})
-                        print('Telegram通知消息已发送')
+                        message += f"{label}: {value} (还剩 {days_remaining} 天)\n"
+                        time.sleep(2)
                 else:
-                    message=(f"{label}: {value}")
-                    r = requests.post(f'https://api.telegram.org/bot{bot_token}/sendMessage', json={"chat_id": chat_id, "text": message})
-                    print('Telegram通知消息已发送')
-    except requests.RequestException as e:
-        message=(f"Error during request for account {account}: {e}")
+                    message += f"{label}: {value}\n"
+                    time.sleep(2)
+
         r = requests.post(f'https://api.telegram.org/bot{bot_token}/sendMessage', json={"chat_id": chat_id, "text": message})
-        print('Telegram通知消息已发送')
+
+    except requests.RequestException as e:
+        print(f"Error during request for account {account}: {e}")
