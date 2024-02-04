@@ -1,7 +1,6 @@
 import requests
 from bs4 import BeautifulSoup
 from datetime import datetime, timedelta
-import time
 import os
 
 bot_token=os.environ["BOT_TOKEN"]
