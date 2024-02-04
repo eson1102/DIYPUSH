@@ -47,4 +47,4 @@ jobs:
         BUCKET: ${{ secrets.BUCKET }}
       run: 
         |-
-          python vps.py
+          python vps2.py
