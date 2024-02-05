@@ -11,7 +11,7 @@ telegram_token = os.environ["BOT_TOKEN"]
 telegram_chat_id = os.environ["CHAT_ID"]
 
 # 使用请求库获取ini文件的内容
-response = requests.get("https://sub.xeton.dev/sub?target=clash&new_name=true&url=https%3A%2F%2Fxsus.cloud%2Fapi%2Fv1%2Fclient%2Fsubscribe%3Ftoken%3D171df0a5b826b4854458f6a32d586549%7Chttps%3A%2F%2Fservice-2yo94l6s-1323819695.gz.tencentapigw.com.cn%2Fapi%2Fv1%2Fclient%2Fsubscribe%3Ftoken%3Dea16d8b2c8a3d1a4a1182edc19d19571%7Chttps%3A%2F%2Fultimate.azurefd.net%2Fapi%2Fv1%2Fclient%2Fsubscribe%3Ftoken%3D895ff76ad8503adcd2cb3d0a747c68f7|https://s4.taoqitu.lol/api/v1/client/subscribe?token=416913abef74f0f74959f31c4599f91f&insert=false&config=https://raw.githubusercontent.com/ACL4SSR/ACL4SSR/master/Clash/config/ACL4SSR_Online_Full_NoAuto.ini&emoji=true&list=false&tfo=false&scv=false&fdn=true&sort=true",timeout=20)
+response = requests.get("https://api.tsutsu.one/sub?target=clash&url=https%3A%2F%2Fxsus.cloud%2Fapi%2Fv1%2Fclient%2Fsubscribe%3Ftoken%3D171df0a5b826b4854458f6a32d586549%7Chttps%3A%2F%2Fservice-2yo94l6s-1323819695.gz.tencentapigw.com.cn%2Fapi%2Fv1%2Fclient%2Fsubscribe%3Ftoken%3Dea16d8b2c8a3d1a4a1182edc19d19571%7Chttps%3A%2F%2Fultimate.azurefd.net%2Fapi%2Fv1%2Fclient%2Fsubscribe%3Ftoken%3D895ff76ad8503adcd2cb3d0a747c68f7%7Chttps%3A%2F%2Fs4.taoqitu.lol%2Fapi%2Fv1%2Fclient%2Fsubscribe%3Ftoken%3D416913abef74f0f74959f31c4599f91f&insert=false&config=https%3A%2F%2Fraw.githubusercontent.com%2FACL4SSR%2FACL4SSR%2Fmaster%2FClash%2Fconfig%2FACL4SSR_Online_Full_NoAuto.ini&emoji=true&list=false&xudp=false&udp=false&tfo=false&expand=true&scv=false&fdn=false&new_name=true",timeout=20)
 file_content = response.content
 
 # 腾讯云COS的配置和客户端初始化
