@@ -2,6 +2,7 @@ import requests
 from bs4 import BeautifulSoup
 from datetime import datetime, timedelta
 import os
+import time
 
 bot_token=os.environ["BOT_TOKEN"]
 chat_id=os.environ["CHAT_ID"]
@@ -14,6 +15,7 @@ accounts = {
     'account4': {'name': '156627504@qq.com', 'cookie': '3XZ26INfMzKMKGrK8hCLVQ%253d%253d%257csolar%2540%25e5%25a5%2589%25e8%25b4%25a4%25e7%2594%259f%25e6%25b4%25bb%257chttps%253a%252f%252fimg.fx696.com%252fthirdparty%252f2516564746%252f2516564746_62872.png_wiki-template-global%257c0755990470%257c115781ff272d1564850a880b17a02de5'},
     'account5': {'name': 'nsjbodelxs@iubridge.com', 'cookie': 'hgD6SmDwqMWP7bAy4gmH2A%253d%253d%257ctom2220%257chttps%253a%252f%252fimg.fx696.com%252fWikiEnterprise%252fsign%252fpersonph.png_wiki-template-global%257c4437224218%257c62d8210130a7dc86ea197189b35e9ab0'},
     'account6': {'name': 'wyrgahvqzn@iubridge.com', 'cookie': 'xNvz6XMM1mseSUsercMZTg%253d%253d%257cjjj8729%257chttps%253a%252f%252fimg.fx696.com%252fWikiEnterprise%252fsign%252fpersonph.png_wiki-template-global%257c4437224251%257cb3db081376e4ec0c50b0b2dd9e028293'},
+    'account7': {'name': 'dbnywhlbfu@iubridge.com', 'cookie': '0s9%252bK%252fBCMPWukDjCNKldTg%253d%253d%257ctom7040%257chttps%253a%252f%252fimg.fx696.com%252fWikiEnterprise%252fsign%252fpersonph.png_wiki-template-global%257c5565590797%257c228de0c63f755f73f1830d8c4a3c1921'},
     # 添加更多账号信息
 }
 
@@ -53,6 +55,7 @@ for index, (account, info) in enumerate(accounts.items(), start=1):
                     message += f"{label}: {value}\n"
                     
         r = requests.post(f'https://api.telegram.org/bot{bot_token}/sendMessage', json={"chat_id": chat_id, "text": message})
+        time.sleep(3)
 
     except requests.RequestException as e:
         print(f"Error during request for account {account}: {e}")
