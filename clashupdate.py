@@ -11,7 +11,7 @@ telegram_token = os.environ["BOT_TOKEN"]
 telegram_chat_id = os.environ["CHAT_ID"]
 
 # 使用请求库获取ini文件的内容
-response = requests.get("https://www.nameless13.com/sub?target=clash&url=https://9ddea9039d074ed4.cdn.jiashule.com/api/v1/client/subscribe?token=ea16d8b2c8a3d1a4a1182edc19d19571|https://xsus.moe/api/v1/client/subscribe?token=171df0a5b826b4854458f6a32d586549|https://s1.taoqitu.lol/api/v1/client/subscribe?token=416913abef74f0f74959f31c4599f91f&insert=false&config=https://raw.githubusercontent.com/ACL4SSR/ACL4SSR/master/Clash/config/ACL4SSR_Online_Full_NoAuto.ini&emoji=true&list=false&xudp=false&udp=false&tfo=false&expand=true&scv=false&fdn=false&new_name=true",timeout=20)
+response = requests.get("https://www.nameless13.com/sub?target=clash&url=https://xsus.moe/api/v1/client/subscribe?token=171df0a5b826b4854458f6a32d586549&insert=false&config=https://raw.githubusercontent.com/ACL4SSR/ACL4SSR/master/Clash/config/ACL4SSR_Online_Full_NoAuto.ini&emoji=true&list=false&xudp=false&udp=false&tfo=false&expand=true&scv=false&fdn=false&new_name=true",timeout=20)
 file_content = response.content
 
 # 腾讯云COS的配置和客户端初始化
