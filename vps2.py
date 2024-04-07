@@ -1,6 +1,6 @@
 import requests
 from bs4 import BeautifulSoup
-from datetime import datetime, timedelta
+from datetime import datetime
 import os
 import time
 
@@ -56,17 +56,11 @@ for index, (account, info) in enumerate(accounts.items(), start=1):
                 if label == "到期日期":
                     expiry_date = datetime.strptime(value, '%Y-%m-%d')
                     days_remaining = (expiry_date - current_date).days
-                    if days_remaining < 5:
-                        message += f"{label}: {value} (即将到期！剩余时间小于5天，还剩 {days_remaining} 天)\n"
+                    if days_remaining < 7:
+                        message += f"{label}: {value} (即将到期！剩余时间小于7天，还剩 {days_remaining} 天)\n"
                         
-                    else:
-                        message += f"{label}: {value} (还剩 {days_remaining} 天)\n"
+                        r = requests.post(f'https://api.telegram.org/bot{bot_token}/sendMessage', json={"chat_id": chat_id, "text": message})
+                        time.sleep(30)
                        
-                else:
-                    message += f"{label}: {value}\n"
-                    
-        r = requests.post(f'https://api.telegram.org/bot{bot_token}/sendMessage', json={"chat_id": chat_id, "text": message})
-        time.sleep(3)
-
     except requests.RequestException as e:
         print(f"Error during request for account {account}: {e}")
