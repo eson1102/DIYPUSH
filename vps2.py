@@ -26,6 +26,8 @@ accounts = {
     #
     'account13': {'name': 'bjtuunopmv@iubridge.com', 'cookie': 'PPgySUq%252bC8tOjdWsbRettQ%253d%253d%257ctom8726%257chttps%253a%252f%252fimg.fx696.com%252fWikiEnterprise%252fsign%252fpersonph.png_wiki-template-global%257c0758300249%257cfff4524f009cb3b18111febec07c3a08'},
     # 添加更多账号信息
+    'account14': {'name': 'gmqnfhbfks@iubridge.com', 'cookie': 'NyQQUJInoD79V7FBklGemw%253d%253d%257chhh457%257chttps%253a%252f%252fimg.fx696.com%252fWikiEnterprise%252fsign%252fpersonph.png_wiki-template-global%257c4433946647%257c7ced40c464cda3e923cc74c0ea1547fd'},
+    # 添加更多账号信息
 }
 
 url = 'https://vps.wikifx.com/zh-cn/jyzh'
