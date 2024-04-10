@@ -30,6 +30,7 @@ accounts = {
     'account15': {'name': 'tmifmahoge@iubridge.com', 'cookie': 'TPrf8cfx2MgVm3OJR9nQ0A%253d%253d%257chhhh723%257chttps%253a%252f%252fimg.fx696.com%252fWikiEnterprise%252fsign%252fpersonph.png_wiki-template-global%257c3213176112%257c538a37f6a60199da2c299ee8c8cff6a5'},
     'account16': {'name': 'gkvcciymld@iubridge.com', 'cookie': 'dIaXUzSBBYnFfAfiS3kNsA%253d%253d%257cggg5352%257chttps%253a%252f%252fimg.fx696.com%252fWikiEnterprise%252fsign%252fpersonph.png_wiki-template-global%257c4433028554%257c845f9e87bd9fc26ca63e0e960b2f0c7a'},
     'account17': {'name': 'hudoaanjnd@iubridge.com', 'cookie': 'UK4QLy%252biJ7fUKEx4c2c5yA%253d%253d%257chh2440%257chttps%253a%252f%252fimg.fx696.com%252fWikiEnterprise%252fsign%252fpersonph.png_wiki-template-global%257c9687315565%257c7af7b43640e6db1a2ee8ad4e650c0cd9'},
+    'account18': {'name': 'srjrzbneiz@iubridge.com', 'cookie': 'J7evgaaQZdz0CH4r34VP1A%253d%253d%257chhh4820%257chttps%253a%252f%252fimg.fx696.com%252fWikiEnterprise%252fsign%252fpersonph.png_wiki-template-global%257c5560005040%257c37d8cd9b092aadc0512ffefb716721eb'},
 }
 
 url = 'https://vps.wikifx.com/zh-cn/jyzh'
