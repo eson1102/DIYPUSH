@@ -31,6 +31,7 @@ accounts = {
     'account16': {'name': 'gkvcciymld@iubridge.com', 'cookie': 'dIaXUzSBBYnFfAfiS3kNsA%253d%253d%257cggg5352%257chttps%253a%252f%252fimg.fx696.com%252fWikiEnterprise%252fsign%252fpersonph.png_wiki-template-global%257c4433028554%257c845f9e87bd9fc26ca63e0e960b2f0c7a'},
     'account17': {'name': 'hudoaanjnd@iubridge.com', 'cookie': 'UK4QLy%252biJ7fUKEx4c2c5yA%253d%253d%257chh2440%257chttps%253a%252f%252fimg.fx696.com%252fWikiEnterprise%252fsign%252fpersonph.png_wiki-template-global%257c9687315565%257c7af7b43640e6db1a2ee8ad4e650c0cd9'},
     'account18': {'name': 'srjrzbneiz@iubridge.com', 'cookie': 'J7evgaaQZdz0CH4r34VP1A%253d%253d%257chhh4820%257chttps%253a%252f%252fimg.fx696.com%252fWikiEnterprise%252fsign%252fpersonph.png_wiki-template-global%257c5560005040%257c37d8cd9b092aadc0512ffefb716721eb'},
+    'account19': {'name': 'pjtgxfbpme@iubridge.com', 'cookie': 'jYvlL6upnO3%252b9RgjrnYk6w%253d%253d%257cbb3833%257chttps%253a%252f%252fimg.fx696.com%252fWikiEnterprise%252fsign%252fpersonph.png_wiki-template-global%257c7866098102%257cca60ca00353e12ed11f6cb5e6d6d0dad'},
 }
 
 url = 'https://vps.wikifx.com/zh-cn/jyzh'
@@ -49,7 +50,7 @@ for index, (account, info) in enumerate(accounts.items(), start=1):
 
         current_date = datetime.now()
 
-        key_labels = ["VPS IP", "到期日期", "近1月实盘交易数量"]
+        key_labels = ["VPS IP", "到期日期", "近1月实盘交易数量","服务器地址"]
 
         for item in information_items:
             label = item.find('div', class_='information-list-item-left').text.strip()
