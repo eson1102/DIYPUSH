@@ -11,7 +11,7 @@ telegram_token = os.environ["BOT_TOKEN"]
 telegram_chat_id = os.environ["CHAT_ID"]
 
 # 使用请求库获取ini文件的内容
-response = requests.get("https://api.tsutsu.one/sub?target=clash&url=https://music.easygourl.xyz/link/McmsZz3oJKPy4b9TdWKO78216LAgj4DQ?config=all|https://gateway.51tu.lol/gateway/sb?token=416913abef74f0f74959f31c4599f91f|https://subscribe.xsus.net.co/api/v1/client/subscribe?token=0ae03574013e75ca024d91c336ae02a2|https://sub.xf.edu.kg/api/v1/client/subscribe?token=ea16d8b2c8a3d1a4a1182edc19d19571&insert=false&config=https://raw.githubusercontent.com/ACL4SSR/ACL4SSR/master/Clash/config/ACL4SSR_Online_Full_NoAuto.ini&emoji=true&list=false&xudp=false&udp=false&tfo=false&expand=true&scv=false&fdn=false&new_name=true",timeout=20)
+response = requests.get("https://url.v1.mk/sub?target=clash&url=https%3A%2F%2Fgateway.51tu.lol%2Fgateway%2Ftaoqitu%3Ftoken%3D416913abef74f0f74959f31c4599f91f%7Chttps%3A%2F%2Fmusic.easygourl.xyz%2Flink%2FMcmsZz3oJKPy4b9TdWKO78216LAgj4DQ%3Fconfig%3Dall%7Chttps%3A%2F%2Fsub.xf.edu.kg%2Fapi%2Fv1%2Fclient%2Fsubscribe%3Ftoken%3Dea16d8b2c8a3d1a4a1182edc19d19571%7C&insert=false&config=https://github.com/eson1102/rules/blob/main/ACL4SSR_Online_Mini_AdblockPlus.ini&emoji=true&list=false&xudp=false&udp=false&tfo=false&expand=true&scv=false&fdn=false&new_name=true",timeout=20)
 file_content = response.content
 
 # 腾讯云COS的配置和客户端初始化
