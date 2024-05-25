@@ -11,7 +11,7 @@ telegram_token = os.environ["BOT_TOKEN"]
 telegram_chat_id = os.environ["CHAT_ID"]
 
 # 使用请求库获取ini文件的内容
-response = requests.get("https://url.v1.mk/sub?target=clash&url=https%3A%2F%2Fsubscribe.xsus.net.co%2Fapi%2Fv1%2Fclient%2Fsubscribe%3Ftoken%3D0ae03574013e75ca024d91c336ae02a2&insert=false&config=https%3A%2F%2Fraw.githubusercontent.com%2FACL4SSR%2FACL4SSR%2Fmaster%2FClash&config=https://github.com/eson1102/rules/blob/main/Mini_MultiCountry.ini&emoji=true&list=false&xudp=false&udp=false&tfo=false&expand=true&scv=false&fdn=false&new_name=true",timeout=20)
+response = requests.get("https://url.v1.mk/sub?target=clash&url=https%3A%2F%2Fsubscribe.xsus.net.co%2Fapi%2Fv1%2Fclient%2Fsubscribe%3Ftoken%3D0ae03574013e75ca024d91c336ae02a2|https://cf.1454250.xyz/api/v1/client/subscribe?token=84b9da24f9b591ca368608cf8339829b&insert=false&config=https%3A%2F%2Fraw.githubusercontent.com%2FACL4SSR%2FACL4SSR%2Fmaster%2FClash&config=https://github.com/eson1102/rules/blob/main/Mini_MultiCountry.ini&emoji=true&list=false&xudp=false&udp=false&tfo=false&expand=true&scv=false&fdn=false&new_name=true",timeout=20)
 file_content = response.content
 
 # 腾讯云COS的配置和客户端初始化
