@@ -11,7 +11,7 @@ telegram_token = os.environ["BOT_TOKEN"]
 telegram_chat_id = os.environ["CHAT_ID"]
 
 # 使用请求库获取ini文件的内容
-response = requests.get("https://url.v1.mk/sub?target=clash&url=https%3A%2F%2Fgateway.51tu.lol%2Fgateway%2Ftaoqitu%3Ftoken%3D416913abef74f0f74959f31c4599f91f%7Chttps%3A%2F%2Fmusic.easygourl.xyz%2Flink%2FMcmsZz3oJKPy4b9TdWKO78216LAgj4DQ%3Fclient%3Dall%7Chttp%3A%2F%2F106.55.106.52%3A22021%2Fapi%2Fv1%2Fclient%2Fsubscribe%3Ftoken%3Dea16d8b2c8a3d1a4a1182edc19d19571&insert=false&config=https://raw.githubusercontent.com/eson1102/rules/main/Mini_MultiCountry.ini&emoji=true&list=false&xudp=false&udp=false&tfo=false&expand=true&scv=false&fdn=true&clash.doh=true&new_name=true",timeout=20)
+response = requests.get("https://url.v1.mk/sub?target=clash&url=https%3A%2F%2Fmcdonaldnode.xyz%2Fapi%2Fv1%2Fclient%2Fsubscribe%3Ftoken%3Da06e102a9eea6eb44a16ebf56d869f17%7Chttps%3A%2F%2Fdy.xftld.xyz%2Fapi%2Fv1%2Fclient%2Fsubscribe%3Ftoken%3Dea16d8b2c8a3d1a4a1182edc19d19571&insert=false&config=https://raw.githubusercontent.com/eson1102/rules/main/Mini_MultiCountry.ini&emoji=true&list=false&xudp=false&udp=false&tfo=false&expand=true&scv=true&fdn=true&clash.doh=true&new_name=true",timeout=20)
 file_content = response.content
 
 # 腾讯云COS的配置和客户端初始化
