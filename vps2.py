@@ -42,7 +42,7 @@ def parse_account_data(html_text):
     current_date = datetime.now()
     account_info = []
 
-    key_labels = ["VPS IP", "到期日期", "近1月实盘交易数量","服务器地址"]
+    key_labels = ["VPS IP", "到期日期", "近1月实盘交易数量", "服务器地址"]
 
     for item in information_items:
         label = item.find('div', class_='information-list-item-left').text.strip()
