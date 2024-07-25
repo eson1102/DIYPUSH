@@ -18,15 +18,15 @@ accounts = {
     'account8': {'name': 'hwqeecfkzd@iubridge.com', 'cookie': 'fj96MZf3%252bStvSnUf%252bUVSyQ%253d%253d%257chh5848%257chttps%253a%252f%252fimg.fx696.com%252fWikiEnterprise%252fsign%252fpersonph.png_wiki-template-global%257c5561623261%257c9e12b8331368e6de79a4436f0b6e3c8e'},
 }
 
-url = 'https://vps.wikifx.com/zh-cn/jyzh'  # 请注意URL末尾的单引号
+url = 'https://vps.wikifx.com/zh-cn/jyzh'  # 确保URL正确
 
 # 消息初始化
-message = ""
+message = "以下是所有账号的VPS信息：\n"
 
 # 遍历多个账号
 for index, (account, info) in enumerate(accounts.items(), start=1):
     cookies = {'DJkdikKMG': info['cookie']}
-    message += f"\n账号 {index}: {info['name']}\n"
+    message += f"账号 {index}: {info['name']}\n"
 
     try:
         r = requests.get(url, cookies=cookies)
@@ -55,10 +55,14 @@ for index, (account, info) in enumerate(accounts.items(), start=1):
                     message += f"{label}: {value}\n"
 
     except requests.RequestException as e:
-        print(f"Error during request for account {account}: {e}")
+        message += f"Error during request for account {account}: {e}\n"  # 将错误信息添加到消息中
 
 # 发送消息
 try:
-    r = requests.post(f'https://api.telegram.org/bot{bot_token}/sendMessage', json={"chat_id": chat_id, "text": message})
+    response = requests.post(
+        f'https://api.telegram.org/bot{bot_token}/sendMessage',
+        json={"chat_id": chat_id, "text": message}
+    )
+    response.raise_for_status()  # 如果API调用失败，将引发异常
 except requests.RequestException as e:
     print(f"Error sending message: {e}")
