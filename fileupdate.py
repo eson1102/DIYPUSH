@@ -14,7 +14,7 @@ telegram_chat_id = os.environ["CHAT_ID"]
 custom_word = "【备用速度慢】"  # 替换为您的自定义词
 
 # 使用请求库获取ini文件的内容
-response = requests.get("https://raw.githubusercontent.com/cmliu/WorkerVless2sub/main/addressesapi.txt", timeout=20)
+response = requests.get("https://ipdb.api.030101.xyz/?type=bestproxy&country=true", timeout=20)
 file_content = response.text
 
 # 处理文件内容，在每行的 '#' 后面添加自定义词
