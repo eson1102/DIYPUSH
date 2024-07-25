@@ -34,5 +34,4 @@ jobs:
         BUCKET: ${{ secrets.BUCKET }}
       run: |
         python clashupdate.py
-        python vps2.py
         python fileupdate.py
