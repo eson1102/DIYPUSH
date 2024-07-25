@@ -2,11 +2,13 @@ import requests
 from bs4 import BeautifulSoup
 from datetime import datetime
 import os
+import time
+import logging
 
-bot_token = os.environ["BOT_TOKEN"]
-chat_id = os.environ["CHAT_ID"]
+# Setup logging
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
-# 定义多个账号的信息
+# Define multiple account information
 accounts = {
     'account1': {'name': 'duncanyu1102@gmail.com', 'cookie': 'codrpWmCzHjBTYo%252bG79kPQ%253d%253d%257cJim6153%257chttps%253a%252f%252fimg.fx696.com%252fthirdparty%252f4769447162%252f4769447162_28637.png_wiki-template-global%257c4423811951%257ca90a7db32d8c6f1833b9e43cac38c93f'},
     'account2': {'name': 'vgfvxixz@idrrate.com', 'cookie': '6OqTtw%252bzch7fL2BJvNgHLQ%253d%253d%257cFX3565537695%257chttps%253a%252f%252fimg.fx696.com%252fWikiEnterprise%252fsign%252fpersonph.png_wiki-template-global%257c5860011989%257c1716000c3d7ab46bf88309f2e7d77bc0'},
@@ -18,51 +20,63 @@ accounts = {
     'account8': {'name': 'hwqeecfkzd@iubridge.com', 'cookie': 'fj96MZf3%252bStvSnUf%252bUVSyQ%253d%253d%257chh5848%257chttps%253a%252f%252fimg.fx696.com%252fWikiEnterprise%252fsign%252fpersonph.png_wiki-template-global%257c5561623261%257c9e12b8331368e6de79a4436f0b6e3c8e'},
 }
 
-url = 'https://vps.wikifx.com/zh-cn/jyzh'  # 确保URL正确
+url = 'https://vps.wikifx.com/zh-cn/jyzh'
+bot_token = os.environ["BOT_TOKEN"]
+chat_id = os.environ["CHAT_ID"]
 
-# 消息初始化
-message = "以下是所有账号的VPS信息：\n"
-
-# 遍历多个账号
-for index, (account, info) in enumerate(accounts.items(), start=1):
+def fetch_account_data(account, info):
     cookies = {'DJkdikKMG': info['cookie']}
-    message += f"账号 {index}: {info['name']}\n"
-
     try:
-        r = requests.get(url, cookies=cookies)
-        r.raise_for_status()
-
-        soup = BeautifulSoup(r.text, 'html.parser')
-        information_items = soup.find_all('div', class_='information-list-item')
-
-        current_date = datetime.now()
-
-        key_labels = ["VPS IP", "到期日期", "近1月实盘交易数量", "服务器地址"]
-
-        for item in information_items:
-            label = item.find('div', class_='information-list-item-left').text.strip()
-            value = item.find('div', class_='information-list-item-right').text.strip()
-
-            if label in key_labels:
-                if label == "到期日期":
-                    expiry_date = datetime.strptime(value, '%Y-%m-%d')
-                    days_remaining = (expiry_date - current_date).days
-                    if days_remaining < 5:
-                        message += f"{label}: {value} (即将到期！剩余时间小于5天，还剩 {days_remaining} 天)\n"
-                    else:
-                        message += f"{label}: {value} (还剩 {days_remaining} 天)\n"
-                else:
-                    message += f"{label}: {value}\n"
-
+        with requests.Session() as session:
+            response = session.get(url, cookies=cookies)
+            response.raise_for_status()
+            return response.text
     except requests.RequestException as e:
-        message += f"Error during request for account {account}: {e}\n"  # 将错误信息添加到消息中
+        logging.error(f"Error during request for account {account}: {e}")
+        return None
 
-# 发送消息
-try:
-    response = requests.post(
-        f'https://api.telegram.org/bot{bot_token}/sendMessage',
-        json={"chat_id": chat_id, "text": message}
-    )
-    response.raise_for_status()  # 如果API调用失败，将引发异常
-except requests.RequestException as e:
-    print(f"Error sending message: {e}")
+def parse_account_data(html_text):
+    soup = BeautifulSoup(html_text, 'html.parser')
+    information_items = soup.find_all('div', class_='information-list-item')
+    
+    current_date = datetime.now()
+    account_info = []
+
+    key_labels = ["VPS IP", "到期日期", "近1月实盘交易数量","服务器地址"]
+
+    for item in information_items:
+        label = item.find('div', class_='information-list-item-left').text.strip()
+        value = item.find('div', class_='information-list-item-right').text.strip()
+
+        if label in key_labels:
+            if label == "到期日期":
+                expiry_date = datetime.strptime(value, '%Y-%m-%d')
+                days_remaining = (expiry_date - current_date).days
+                if days_remaining < 5:
+                    account_info.append(f"{label}: {value} (即将到期！剩余时间小于5天，还剩 {days_remaining} 天)")
+                else:
+                    account_info.append(f"{label}: {value} (还剩 {days_remaining} 天)")
+            else:
+                account_info.append(f"{label}: {value}")
+
+    return "\n".join(account_info)
+
+def send_telegram_message(message):
+    try:
+        requests.post(f'https://api.telegram.org/bot{bot_token}/sendMessage', json={"chat_id": chat_id, "text": message})
+    except requests.RequestException as e:
+        logging.error(f"Error sending message: {e}")
+
+def main():
+    combined_message = ""
+    for index, (account, info) in enumerate(accounts.items(), start=1):
+        html_text = fetch_account_data(account, info)
+        if html_text:
+            account_info = parse_account_data(html_text)
+            combined_message += f"\n帐号 {index}: {info['name']}\n{account_info}\n"
+    
+    if combined_message:
+        send_telegram_message(combined_message)
+
+if __name__ == "__main__":
+    main()
