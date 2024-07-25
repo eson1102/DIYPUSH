@@ -1,11 +1,10 @@
 import requests
 from bs4 import BeautifulSoup
-from datetime import datetime, timedelta
+from datetime import datetime
 import os
-import time
 
-bot_token=os.environ["BOT_TOKEN"]
-chat_id=os.environ["CHAT_ID"]
+bot_token = os.environ["BOT_TOKEN"]
+chat_id = os.environ["CHAT_ID"]
 
 # 定义多个账号的信息
 accounts = {
@@ -19,12 +18,15 @@ accounts = {
     'account8': {'name': 'hwqeecfkzd@iubridge.com', 'cookie': 'fj96MZf3%252bStvSnUf%252bUVSyQ%253d%253d%257chh5848%257chttps%253a%252f%252fimg.fx696.com%252fWikiEnterprise%252fsign%252fpersonph.png_wiki-template-global%257c5561623261%257c9e12b8331368e6de79a4436f0b6e3c8e'},
 }
 
-url = 'https://vps.wikifx.com/zh-cn/jyzh'
+url = 'https://vps.wikifx.com/zh-cn/jyzh'  # 请注意URL末尾的单引号
+
+# 消息初始化
+message = ""
 
 # 遍历多个账号
 for index, (account, info) in enumerate(accounts.items(), start=1):
     cookies = {'DJkdikKMG': info['cookie']}
-    message = f"\n帐号 {index}: {info['name']}\n"
+    message += f"\n账号 {index}: {info['name']}\n"
 
     try:
         r = requests.get(url, cookies=cookies)
@@ -35,7 +37,7 @@ for index, (account, info) in enumerate(accounts.items(), start=1):
 
         current_date = datetime.now()
 
-        key_labels = ["VPS IP", "到期日期", "近1月实盘交易数量","服务器地址"]
+        key_labels = ["VPS IP", "到期日期", "近1月实盘交易数量", "服务器地址"]
 
         for item in information_items:
             label = item.find('div', class_='information-list-item-left').text.strip()
@@ -47,15 +49,16 @@ for index, (account, info) in enumerate(accounts.items(), start=1):
                     days_remaining = (expiry_date - current_date).days
                     if days_remaining < 5:
                         message += f"{label}: {value} (即将到期！剩余时间小于5天，还剩 {days_remaining} 天)\n"
-                        
                     else:
                         message += f"{label}: {value} (还剩 {days_remaining} 天)\n"
-                       
                 else:
                     message += f"{label}: {value}\n"
-                    
-        r = requests.post(f'https://api.telegram.org/bot{bot_token}/sendMessage', json={"chat_id": chat_id, "text": message})
-        time.sleep(10)
 
     except requests.RequestException as e:
         print(f"Error during request for account {account}: {e}")
+
+# 发送消息
+try:
+    r = requests.post(f'https://api.telegram.org/bot{bot_token}/sendMessage', json={"chat_id": chat_id, "text": message})
+except requests.RequestException as e:
+    print(f"Error sending message: {e}")
