@@ -35,3 +35,4 @@ jobs:
       run: |
         python clashupdate.py
         python fileupdate.py
+        python vps3.py
