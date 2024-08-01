@@ -1,6 +1,7 @@
 import requests
 from bs4 import BeautifulSoup
 import threading
+import os
 
 # 目标网页URL
 url = 'https://vps.wikifx.com/zh-cn/jyzh'
