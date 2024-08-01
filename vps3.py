@@ -14,11 +14,7 @@ chat_id = os.environ["CHAT_ID"]
 cookies_list = [
     {
         'DJkdikKMG': '6OqTtw%252bzch7fL2BJvNgHLQ%253d%253d%257cFX3565537695%257chttps%253a%252f%252fimg.fx696.com%252fWikiEnterprise%252fsign%252fpersonph.png_wiki-template-global%257c5860011989%257c1716000c3d7ab46bf88309f2e7d77bc0',
-        'remark': '账号1'
-    },
-    {
-        'DJkdikKMG': 'another_cookie_value',
-        'remark': '账号2'
+        'remark': 'vgfvxixz@idrrate.com'
     },
     # 添加更多账号的cookies和备注
 ]
