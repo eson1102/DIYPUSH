@@ -24,6 +24,10 @@ cookies_list = [
         'DJkdikKMG': '3XZ26INfMzKMKGrK8hCLVQ%253d%253d%257csolar%2540%25e5%25a5%2589%25e8%25b4%25a4%25e7%2594%259f%25e6%25b4%25bb%257chttps%253a%252f%252fimg.fx696.com%252f%252fthirdparty%252f2516564746%252f2516564746_62872.png_wiki200%257c0764476263%257c85adec8a8301ca2a19a4fbcdd7f041dd',
         'remark': '156627504@qq.com'
     },
+    {
+        'DJkdikKMG': 'l4D9tnpeGd4CnDxzLmP8Bw%253d%253d%257c%25e9%25a1%25be%25e5%25b0%258f%25e9%2593%25ad%2B%25e8%25b4%25a4%25e5%2595%2586%25e8%258d%259f%25c2%25ae%25e4%25bc%2597%25e5%2588%259b%25e7%25a9%25ba%25e9%2597%25b4%257chttps%253a%252f%252fimg.fx696.com%252f%252fthirdparty%252f3731259258%252f3731259258_24995.png_wiki200%257c5684213809%257c4e1b12aecd84921870a82460de102e02',
+        'remark': 'magiceson@vip.qq.com'
+    },
     # 添加更多账号的cookies和备注
 ]
 
