@@ -1,9 +1,6 @@
 name: diy push
 
 on:
-  push:
-    branches:
-      - main
   schedule:
     - cron: '0 23 * * *' # Run at 11 PM every day
 
