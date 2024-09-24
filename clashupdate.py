@@ -11,7 +11,7 @@ telegram_token = os.environ["BOT_TOKEN"]
 telegram_chat_id = os.environ["CHAT_ID"]
 
 # 使用请求库获取ini文件的内容
-response = requests.get("https://url.v1.mk/sub?target=clash&url=https%3A%2F%2Fmcdonaldnode.xyz%2Fapi%2Fv1%2Fclient%2Fsubscribe%3Ftoken%3Da06e102a9eea6eb44a16ebf56d869f17%7Chttps%3A%2F%2Fdy.xftld.xyz%2Fapi%2Fv1%2Fclient%2Fsubscribe%3Ftoken%3Dea16d8b2c8a3d1a4a1182edc19d19571&insert=false&config=https://raw.githubusercontent.com/eson1102/rules/main/Mini_MultiCountry.ini&emoji=true&list=false&xudp=false&udp=false&tfo=false&expand=true&scv=true&fdn=true&clash.doh=true&new_name=true",timeout=20)
+response = requests.get("https://subapi.fxxk.dedyn.io/sub?&url=https%3A%2F%2Fraw.githubusercontent.com%2Feson1102%2Frules%2Frefs%2Fheads%2Fmain%2Fpath%2Fin%2Frepo%2Faa.txt&target=clash&emoji=true&append_type=true&append_info=true&scv=false&udp=false&list=false&sort=false&fdn=true&insert=false",timeout=20)
 file_content = response.content
 
 # 腾讯云COS的配置和客户端初始化
