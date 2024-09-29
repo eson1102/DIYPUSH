@@ -3,10 +3,7 @@ from bs4 import BeautifulSoup
 import threading
 import os
 
-# 目标网页URL
 url = 'https://vps.wikifx.com/zh-cn/jyzh'
-
-# Telegram bot token和chat ID
 bot_token = os.environ["BOT_TOKEN"]
 chat_id = os.environ["CHAT_ID"]
 
@@ -46,20 +43,14 @@ cookies_list = [
     # 添加更多账号的cookies和备注
 ]
 
+messages = []  # 用于存储所有账号的消息
+
 def fetch_data(cookies):
     try:
-        # 发送GET请求
         response = requests.get(url, cookies=cookies)
-        
-        # 检查请求是否成功
         if response.status_code == 200:
-            # 使用BeautifulSoup解析HTML
             soup = BeautifulSoup(response.content.decode('utf-8'), 'html.parser')
-            
-            # 定位到包含所需信息的div元素
             information_div = soup.find('div', class_='information-list')
-            
-            # 提取并打印信息
             if information_div:
                 message = f'{cookies["remark"]}:\n'
                 for item in information_div.find_all('div', class_='information-list-item'):
@@ -67,25 +58,23 @@ def fetch_data(cookies):
                     right = item.find('div', class_='information-list-item-right').text.strip()
                     if left in ['VPS IP', '服务器地址', '到期日期', '近1月实盘交易数量']:
                         message += f'  {left}: {right}\n'
-                # 发送消息到Telegram
-                requests.post(f'https://api.telegram.org/bot{bot_token}/sendMessage', json={"chat_id": chat_id, "text": message})
+                messages.append(message)
             else:
-                message = f'{cookies["remark"]}: 没有找到包含信息的div元素。'
-                requests.post(f'https://api.telegram.org/bot{bot_token}/sendMessage', json={"chat_id": chat_id, "text": message})
+                messages.append(f'{cookies["remark"]}: 没有找到包含信息的div元素。')
         else:
-            message = f'{cookies["remark"]}: 请求失败，状态码：{response.status_code}'
-            requests.post(f'https://api.telegram.org/bot{bot_token}/sendMessage', json={"chat_id": chat_id, "text": message})
+            messages.append(f'{cookies["remark"]}: 请求失败，状态码：{response.status_code}')
     except Exception as e:
-        message = f'{cookies["remark"]}: 请求发生错误：{e}'
-        requests.post(f'https://api.telegram.org/bot{bot_token}/sendMessage', json={"chat_id": chat_id, "text": message})
+        messages.append(f'{cookies["remark"]}: 请求发生错误：{e}')
 
-# 创建并启动线程
 threads = []
 for cookies in cookies_list:
     thread = threading.Thread(target=fetch_data, args=(cookies,))
     threads.append(thread)
     thread.start()
 
-# 等待所有线程完成
 for thread in threads:
     thread.join()
+
+# 合成消息并发送
+final_message = '\n'.join(messages)
+requests.post(f'https://api.telegram.org/bot{bot_token}/sendMessage', json={"chat_id": chat_id, "text": final_message})
