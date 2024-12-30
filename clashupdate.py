@@ -11,7 +11,7 @@ telegram_token = os.environ["BOT_TOKEN"]
 telegram_chat_id = os.environ["CHAT_ID"]
 
 # 使用请求库获取ini文件的内容
-response = requests.get("https://subapi.fxxk.dedyn.io/sub?&url=https%3A%2F%2Fraw.githubusercontent.com%2Feson1102%2Frules%2Frefs%2Fheads%2Fmain%2Fpath%2Fin%2Frepo%2Faa.txt&target=clash&config=https%3A%2F%2Fraw.githubusercontent.com%2Fcmliu%2FACL4SSR%2Fmain%2FClash%2Fconfig%2FACL4SSR_Online_Full.ini&emoji=true&append_type=true&append_info=true&scv=true&udp=false&list=false&sort=false&fdn=true&insert=false",timeout=20)
+response = requests.get("https://url.v1.mk/sub?&url=https%3A%2F%2Fsub.xfltd.cfd%2Fapi%2Fv1%2Fclient%2Fsubscribe%3Ftoken%3D2e9d42c620338cff80d3fd86eca0f31a%7Chttps%3A%2F%2Fdy2.godsky.top%2Fapi%2Fv1%2Fclient%2Fsubscribe%3Ftoken%3D168ab63f0f511e5e244e41aa4db54010%7Chttp%3A%2F%2F101.200.14.80%3A3325%2Fapi%2Fv1%2Fclient%2Fsubscribe%3Ftoken%3Dcdaea491048645724ba1bd9b681ec3ec&target=clash&config=https%3A%2F%2Fraw.githubusercontent.com%2Fcmliu%2FACL4SSR%2Fmain%2FClash%2Fconfig%2FACL4SSR_Online_MultiCountry_CF.ini&emoji=true&append_type=true&append_info=true&scv=false&udp=false&list=false&sort=false&fdn=true&insert=false",timeout=200)
 file_content = response.content
 
 # 腾讯云COS的配置和客户端初始化
