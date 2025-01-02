@@ -11,7 +11,7 @@ telegram_token = os.environ["BOT_TOKEN"]
 telegram_chat_id = os.environ["CHAT_ID"]
 
 # 使用请求库获取ini文件的内容
-response = requests.get("https://subapi.fxxk.dedyn.io/sub?&url=https%3A%2F%2Fsub.xfltd.cfd%2Fapi%2Fv1%2Fclient%2Fsubscribe%3Ftoken%3D2e9d42c620338cff80d3fd86eca0f31a&target=clash&emoji=true&append_type=true&append_info=true&scv=true&udp=false&list=false&sort=false&fdn=true&insert=false",timeout=200)
+response = requests.get("https://subapi.fxxk.dedyn.io/sub?&url=https%3A%2F%2Fsub2.anrunix.xyz%2Fapi%2Fv1%2Fclient%2Fsubscribe%3Ftoken%3Db834f5e1399ecd25d9aa107254cf3d68&target=clash&emoji=true&append_type=true&append_info=true&scv=true&udp=false&list=false&sort=false&fdn=true&insert=false",timeout=200)
 file_content = response.content
 print(response)
 # 腾讯云COS的配置和客户端初始化
