@@ -11,7 +11,7 @@ telegram_token = os.environ["BOT_TOKEN"]
 telegram_chat_id = os.environ["CHAT_ID"]
 
 # 使用请求库获取ini文件的内容
-response = requests.get("https://url.v1.mk/sub?target=clash&url=https%3A%2F%2Fsub.xfltd.cfd%2Fapi%2Fv1%2Fclient%2Fsubscribe%3Ftoken%3D2e9d42c620338cff80d3fd86eca0f31a%7Chttps%3A%2F%2Fxdom0.no-mad-world.club%2Flink%2FnPOcm31CLKPFaKkm%3Fclash%3D3&insert=false&config=https%3A%2F%2Fraw.githubusercontent.com%2FACL4SSR%2FACL4SSR%2Fmaster%2FClash%2Fconfig%2FACL4SSR_Online_Full_NoAuto.ini&emoji=true&list=false&xudp=false&udp=false&tfo=false&expand=true&scv=true&fdn=true&new_name=true",timeout=200)
+response = requests.get("https://sub.xfltd.cfd/api/v1/client/subscribe?token=2e9d42c620338cff80d3fd86eca0f31a&flag=clash",timeout=200)
 file_content = response.content
 print(response)
 # 腾讯云COS的配置和客户端初始化
