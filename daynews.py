@@ -38,7 +38,7 @@ data = requests.get(url).json()
 beijing_tz = pytz.timezone('Asia/Shanghai')
 
 # Prepare a single message to merge all the information
-merged_message = "5 星新闻提醒" + "\n" + "="*20 + "\n"
+merged_message = "今日 5 星新闻提醒"+"\n"+"数据来自金十数据"+"\n"+"="*20+"\n"
 
 # Flag to check if there are any 5-star news
 has_5_star_news = False
