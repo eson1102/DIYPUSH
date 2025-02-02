@@ -2,6 +2,7 @@ import requests
 from datetime import datetime, timedelta, timezone
 import pytz
 from concurrent.futures import ThreadPoolExecutor
+import os
 
 # Send message to Telegram
 def send_telegram_message(message, bot_token, chat_id):
