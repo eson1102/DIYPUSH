@@ -1,4 +1,4 @@
-name: 每周5星新闻提醒
+name: 每天5星新闻提醒
 
 on:
   schedule:
