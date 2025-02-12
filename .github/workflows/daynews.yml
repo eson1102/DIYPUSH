@@ -19,8 +19,9 @@ jobs:
         with:
           python-version: "3.9"
 
-      - name: 📦 安装依赖
-         run: pip install -r requirements.txt
+            - name: 📦 安装依赖
+        run: pip install requests beautifulsoup4
+run:PIP install pytz
 
       - name: 🚀 运行交易报告脚本
         env:
