@@ -21,6 +21,7 @@ jobs:
 
       - name: 📦 安装依赖
         run: pip install requests beautifulsoup4
+             pip install pytz
 
       - name: 🚀 运行交易报告脚本
         env:
