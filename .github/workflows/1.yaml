@@ -33,3 +33,4 @@ jobs:
       run: |
         python clashupdate.py
         python vps3.py
+        python eahub.py
