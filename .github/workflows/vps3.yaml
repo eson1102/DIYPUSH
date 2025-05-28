@@ -1,0 +1,35 @@
+name: diy push
+
+on:
+  workflow_dispatch:  # 手动触发
+  schedule:
+    - cron: '0 23 * * *' # Run at 11 PM every day
+
+jobs:
+  diy_push:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v2
+
+    - name: Set up Python
+      uses: actions/setup-python@v2
+      with:
+        python-version: 3.9
+
+    - name: Install dependencies
+      run: pip install -r requirements.txt
+
+    - name: Run Python Scripts
+      env:
+        BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
+        CHAT_ID: ${{ secrets.CHAT_ID }}
+        QYWECHAT_ID: ${{ secrets.QYWECHAT_ID }}
+        SECRET_ID: ${{ secrets.SECRET_ID }}
+        SECRET_KEY: ${{ secrets.SECRET_KEY }}
+        REGION: ${{ secrets.REGION }}
+        BUCKET: ${{ secrets.BUCKET }}
+      run: |
+        python vps3.py
+        python eahub.py
