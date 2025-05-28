@@ -3,7 +3,7 @@ name: diy push
 on:
   workflow_dispatch:  # 手动触发
   schedule:
-    - cron: '* /30 * * *' # Run at 11 PM every day
+    - cron: '*/15 * * * *' # Run at 11 PM every day
 
 jobs:
   diy_push:
