@@ -3,7 +3,7 @@ name: diy push
 on:
   workflow_dispatch:  # 手动触发
   schedule:
-    - cron: '0 23 * * *' # Run at 11 PM every day
+    - cron: '* /30 * * *' # Run at 11 PM every day
 
 jobs:
   diy_push:
@@ -32,5 +32,3 @@ jobs:
         BUCKET: ${{ secrets.BUCKET }}
       run: |
         python clashupdate.py
-        python vps3.py
-        python eahub.py
