@@ -1,0 +1,61 @@
+name: Process and Upload Clash YAML
+
+on:
+  workflow_dispatch:
+
+jobs:
+  process_upload:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Download Clash YAML
+        run: |
+          curl -L -o clash.yaml "https://cfdingyue-4lu.pages.dev/a5ce27a6-76df-48da-be62-493fbda9a3af?clash"
+
+      - name: Download rename.js
+        run: |
+          curl -L -o rename.js "https://raw.githubusercontent.com/yaney01/Keywos/refs/heads/main/rename.js"
+          chmod +x rename.js
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+
+      - name: Run rename.js to process YAML
+        run: |
+          node rename.js clash.yaml processed.yaml
+
+      - name: Upload processed.yaml to Tencent COS
+        env:
+          TENCENT_SECRET_ID: ${{ secrets.TENCENT_SECRET_ID }}
+          TENCENT_SECRET_KEY: ${{ secrets.TENCENT_SECRET_KEY }}
+          COS_BUCKET: 'chitu-1251006555'       # 请替换成你的桶名
+          COS_REGION: 'ap-shanghai'              # 请替换成你的地域
+          COS_KEY: 'processed/processed.yaml'  # 上传到桶内的路径
+        run: |
+          npm install cos-nodejs-sdk-v5
+          node -e "
+            const COS = require('cos-nodejs-sdk-v5');
+            const fs = require('fs');
+            const cos = new COS({
+              SecretId: process.env.TENCENT_SECRET_ID,
+              SecretKey: process.env.TENCENT_SECRET_KEY
+            });
+            cos.putObject({
+              Bucket: process.env.COS_BUCKET,
+              Region: process.env.COS_REGION,
+              Key: process.env.COS_KEY,
+              Body: fs.createReadStream('processed.yaml')
+            }, function(err, data) {
+              if (err) {
+                console.error('Upload failed:', err);
+                process.exit(1);
+              } else {
+                console.log('Upload success:', data);
+              }
+            });
+          "
