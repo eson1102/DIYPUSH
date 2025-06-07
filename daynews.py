@@ -5,12 +5,12 @@ from concurrent.futures import ThreadPoolExecutor
 import os
 
 # Send message to Telegram
-def send_telegram_message(message, bot_token, chat_id):
-    requests.post(f'https://api.telegram.org/bot{bot_token}/sendMessage', data={
-        'chat_id': chat_id,
-        'text': message,
-        'parse_mode': 'Markdown'
-    })
+#def send_telegram_message(message, bot_token, chat_id):
+#    requests.post(f'https://api.telegram.org/bot{bot_token}/sendMessage', data={
+#        'chat_id': chat_id,
+#        'text': message,
+#        'parse_mode': 'Markdown'
+#    })
 
 # Send message to WeChat Work
 def send_wechat_message(message, webhook_url):
