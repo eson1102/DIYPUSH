@@ -79,7 +79,7 @@ def send_notifications(message):
     if push_notifications_enabled:
         with ThreadPoolExecutor() as executor:
             # Send messages concurrently to Telegram and WeChat
-            executor.submit(send_telegram_message, message, telegram_bot_token, telegram_chat_id)
+            #executor.submit(send_telegram_message, message, telegram_bot_token, telegram_chat_id)
             executor.submit(send_wechat_message, message, wechat_webhook_url1)
             executor.submit(send_wechat_message, message, wechat_webhook_url2)
 
