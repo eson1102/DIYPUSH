@@ -32,4 +32,4 @@ jobs:
         BUCKET: ${{ secrets.BUCKET }}
       run: |
         python wikifx.py
-        python eahub.py
+#        python eahub.py
