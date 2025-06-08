@@ -31,5 +31,5 @@ jobs:
         REGION: ${{ secrets.REGION }}
         BUCKET: ${{ secrets.BUCKET }}
       run: |
-        python vps3.py
+        python wikifx.py
         python eahub.py
