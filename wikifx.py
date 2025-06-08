@@ -6,7 +6,7 @@ import os
 
 chat_id = os.environ["CHAT_ID"]
 # 企业微信机器人Webhook地址
-WEBHOOK_URL = "https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key="+"chat_id"
+WEBHOOK_URL = "https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=e75ac7b2-f7e7-45a5-a7b8-0f92390ab020"
 # 目标URL
 url = "https://vps.wikifx.com/zh-cn/jyzh"
 
