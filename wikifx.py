@@ -277,7 +277,6 @@ def check_vps_status():
 ⚠️ 低交易(0<x<10): {stats['low_transactions']}
 
 ⏳ 到期问题统计
-❗❗ 已过期: {stats['expired']}
 急需续费(≤3天): {stats['expiring_urgent']}
 需续费(≤7天): {stats['expiring_soon']}
 
@@ -289,7 +288,7 @@ def check_vps_status():
         critical_report = "\n\n🚨 问题VPS列表\n"
         for vps in stats['critical_vps']:
             critical_report += f"""
-📌 账号: {vps['account']}
+账号: {vps['account']}
 IP: {vps['ip']}
 地区: {vps['location']}"""
             for problem in vps['problems']:
