@@ -1,4 +1,4 @@
-name: diy push
+name: 天眼云vps统计以及eahub自动回复
 
 on:
   workflow_dispatch:  # 手动触发
