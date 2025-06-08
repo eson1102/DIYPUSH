@@ -370,9 +370,33 @@ def post_reply(post_url, reply_content, cookies=None, headers=None):
 if __name__ == '__main__':
     # 示例cookies（使用你提供的cookies）
     example_cookies = {
-        '64rF_2132_saltkey': 'fzj0Ju0G',
-        '64rF_2132_auth': '9d84eWlfKK1tZ6ya2%2Br5ZB3tLp4xRIjl3VR1q9uSOZ%2FNtH%2BkmJlOUMPmtfskTzVW00hJjdah9hX3rBBBU8DfeOQ',
-    }
+        "HMACCOUNT": "AA7C9B444AE3055C",
+        "64rF_2132_smile": "4D1",
+        "64rF_2132_home_diymode": "1",
+        "64rF_2132_clearUserdata": "forum",
+        "64rF_2132_saltkey": "lTzFqxj6",
+        "64rF_2132_lastvisit": "1748056159",
+        "64rF_2132_auth": "44f6QYaX51t%2B2YBfTOANZEhlmVd3s7IjhkYnq7UfLdclP4YmxHX2Zkep%2Bx48pkqKUfGb25qgK7Mx%2F9RGTb1reF8",
+        "seaHis": "%5B%22%E9%87%91%E9%94%81%22%5D",
+        "64rF_2132_visitedfid": "41",
+        "64rF_2132_st_p": "610%7C1749213767%7C831dc835af34172f37ec1f1da27ecab5",
+        "64rF_2132_zqlj_userlog": "8d39e191aa6d02f5bb8cee2df4cac047",
+        "64rF_2132_pc_size_c": "0",
+        "64rF_2132_ulastactivity": "89faq8Ohr9CVMtMNDm8d9V6KQRkW2JVPcxkc1TPooofecoZYANKG",
+        "64rF_2132_viewid": "uid_610",
+        "Hm_lvt_bb18f408ae1aff391c9ec42813571ad9": "1749364360",
+        "Hm_lpvt_bb18f408ae1aff391c9ec42813571ad9": "1749366441",
+        "64rF_2132_noticeTitle": "1",
+        "64rF_2132_sid": "jI6fEF",
+        "64rF_2132_lip": "178.239.123.9%2C1749367788",
+        "64rF_2132_st_t": "610%7C1749368614%7C3c181f3fb971dcf05c7fb8bb9fc6eeb3",
+        "64rF_2132_forum_lastvisit": "D_41_1749368614",
+        "64rF_2132_checkpm": "1",
+        "64rF_2132_lastcheckfeed": "610%7C1749368616",
+        "64rF_2132_checkfollow": "1",
+        "64rF_2132_lastact": "1749368631%09forum.php%09viewthread",
+        "64rF_2132_nomultiple": "6aa72e513babbe54cb531ea523aa8811"
+        }
     
     # 获取最新5篇帖子
     print("正在获取最新帖子...")
