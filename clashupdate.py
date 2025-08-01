@@ -12,7 +12,7 @@ telegram_chat_id = os.environ["CHAT_ID"]
 
 # 使用请求库获取 ini 文件的内容
 response = requests.get(
-    "https://subapi.cmliussss.net/sub?&url=https%3A%2F%2Fapi.rss.xfsub.cc%2F%3Fd3b1c02e14b0794cb2af657c89c32986%7C&target=clash&emoji=true&append_type=true&append_info=true&scv=false&udp=false&list=false&sort=false&fdn=false&insert=false",
+    "https://subapi.cmliussss.net/sub?&url=https%3A%2F%2Fapi.rss.xfsub.cc%2F%3Fd3b1c02e14b0794cb2af657c89c32986%7C&target=clash&emoji=true&append_type=true&append_info=true&scv=true&udp=false&list=false&sort=false&fdn=false&insert=false",
     timeout=200
 )
 
