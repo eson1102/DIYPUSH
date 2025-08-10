@@ -1,12 +1,9 @@
 import requests
 from bs4 import BeautifulSoup
 import time
-from datetime import datetime, timedelta
-import os
-
-chat_id = os.environ.get("CHAT_ID", "未设置")  # 可选使用
-WEBHOOK_URL = "https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=e75ac7b2-f7e7-45a5-a7b8-0f92390ab020"
-url = "https://vps.wikifx.com/zh-cn/jyzh"
+from datetime import datetime
+from concurrent.futures import ThreadPoolExecutor, as_completed
+import random
 
 LOCATION_EMOJIS = {
     "香港": "🇭🇰", "新加坡": "🇸🇬", "美国": "🇺🇸", "日本": "🇯🇵",
@@ -15,7 +12,18 @@ LOCATION_EMOJIS = {
     "俄罗斯": "🇷🇺", "巴西": "🇧🇷", "印度": "🇮🇳"
 }
 
-# 你的cookies列表
+# 企业微信机器人Webhook地址（群机器人）
+WEBHOOK_URL = "https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=e75ac7b2-f7e7-45a5-a7b8-0f92390ab020"
+# VPS检查页面
+url = "https://vps.wikifx.com/zh-cn/jyzh"
+
+# 配置参数
+MAX_THREADS = 3
+TIMEOUT = 15
+RETRY_COUNT = 2
+# 消息类型: "text" 或 "markdown"
+MESSAGE_TYPE = "text"  # 可切换为"markdown"使用富文本格式
+
 cookies_list = [
     {
         'DJkdikKMG': '6OqTtw%252bzch7fL2BJvNgHLQ%253d%253d%257cFX3565537695%257chttps%253a%252f%252fimg.fx696.com%252fWikiEnterprise%252fsign%252fpersonph.png_wiki-template-global%257c5860011989%257c1716000c3d7ab46bf88309f2e7d77bc0',
@@ -30,240 +38,305 @@ cookies_list = [
         'remark': '156627504@qq.com'
     },
     {
-        'DJkdikKMG': 'l4D9tnpeGd4CnDxzLmP8Bw%253d%253d%257c%25e9%25a1%25be%25e5%25b0%258f%25e9%2593%25ad%2B%25e8%25b4%25a4%25e5%2595%2586%25e8%258d%259f%25c2%25ae%25e4%25bc%2597%25e5%2588%259b%25e7%25a9%25ba%25e9%2597%25b4%257chttps%253a%252f%252fimg.fx696.com%252f%252fthirdparty%252f3731259258%252f3731259258_24995.png_wiki200%257c5684213809%257c4e1b12aecd84921870a82460de102e02',
-        'remark': 'magiceson@vip.qq.com'
-    },
-    {
-        'DJkdikKMG': 
-'hgD6SmDwqMWP7bAy4gmH2A%253d%253d%257ctom2220%257chttps%253a%252f%252fimg.fx696.com%252fWikiEnterprise%252fsign%252fpersonph.png_wiki-template-global%257c4557438868%257c2dc336931d74210f917b12f7e3d7201b',
-        'remark': 'nsjbodelxs@iubridge.com'
-    },
-    {
-        'DJkdikKMG': 
-'ncK4Do%252fFX08LfUpcy2Vuog%253d%253d%257cbh91%257chttps%253a%252f%252fimg.fx696.com%252fWikiEnterprise%252fsign%252fpersonph.png_wiki-template-global%257c9558792639%257c9902dc74056508234edfe3e68fef9c14',
+        'DJkdikKMG': 'ncK4Do%2fFX08LfUpcy2Vuog%3d%3d%7cbh91%7chttps%3a%2f%2fimg.fx696.com%2fWikiEnterprise%2fsign%2fpersonph.png_wiki-template-global%7c9575322624%7cddb7515da1b345f9e4c3f14192cbb265',
         'remark': 'iijoidpfdc@iubridge.com'
-    },
-    {
-        'DJkdikKMG': 
-'fj96MZf3%252bStvSnUf%252bUVSyQ%253d%253d%257chh5848%257chttps%253a%252f%252fimg.fx696.com%252fWikiEnterprise%252fsign%252fpersonph.png_wiki-template-global%257c5685545944%257cb10eccbe4f8f269cf4e6e351b0c0d387',
-        'remark': 'hwqeecfkzd@iubridge.com'
-    },
-    {
-        'DJkdikKMG': 
-'xNvz6XMM1mseSUsercMZTg%253d%253d%257cjjj8729%257chttps%253a%252f%252fimg.fx696.com%252fWikiEnterprise%252fsign%252fpersonph.png_wiki-template-global%257c4553966332%257ce3524da70aa8e09a9fce9e1df950b93e',
-        'remark': 'wyrgahvqzn@iubridge.com'
-    },
-    {
-        'DJkdikKMG': 
-'PPgySUq%252bC8tOjdWsbRettQ%253d%253d%257ctom8726%257chttps%253a%252f%252fimg.fx696.com%252fWikiEnterprise%252fsign%252fpersonph.png_wiki-template-global%257c0871730611%257c8f8fb7b0f75f8861ddfeaf70faed0555',
-        'remark': 'bjtuunopmv@iubridge.com'
-    },
-    {
-        'DJkdikKMG': 
-'nZ%2fREPYCNY4jChEq2TyhJQ%3d%3d%7cttt2655%7chttps%3a%2f%2fimg.fx696.com%2fWikiEnterprise%2fsign%2fpersonph.png_wiki-template-global%7c4874607030%7c38ffe74365d16319e350687690da2640',
-        'remark': 'pyjangubwq@iubridge.com'
-    },
-        {
-        'DJkdikKMG': 
-'bAmJqy7fF8ar2mW4Zpm7CQ%3d%3d%7chj1810%7chttps%3a%2f%2fimg.fx696.com%2fWikiEnterprise%2fsign%2fpersonph.png_wiki-template-global%7c4537459372%7c4fd335a3c568bc551872525f717282be',
-        'remark': 'zdznfwehez@iubridge.com'
-    },
+    }
     # 添加更多账号的cookies和备注
 ]
 
 
-def send_wechat_notification(message):
-    max_length = 1800
-    segments = [message[i:i+max_length] for i in range(0, len(message), max_length)]
-    for i, segment in enumerate(segments):
-        if len(segments) > 1:
-            segment = f"【分段 {i+1}/{len(segments)}】\n{segment}"
-        payload = {"msgtype": "text", "text": {"content": segment}}
-        response = requests.post(WEBHOOK_URL, json=payload)
-        if response.status_code != 200:
-            print(f"⚠️ 消息发送失败: {response.text}")
-        time.sleep(1)
+def send_wechat_text_message(webhook_url, content):
+    """发送文本消息到企业微信群机器人"""
+    if not webhook_url or "key=" not in webhook_url:
+        print("无效的Webhook地址，必须包含key参数")
+        return False
+        
+    headers = {
+        "Content-Type": "application/json"
+    }
+    
+    data = {
+        "msgtype": "text",
+        "text": {
+            "content": content
+        }
+    }
+    
+    try:
+        response = requests.post(webhook_url, json=data, headers=headers, timeout=10)
+        result = response.json()
+        
+        if result.get("errcode") == 0:
+            print("文本消息发送成功")
+            return True
+        else:
+            print(f"文本消息发送失败: {result.get('errmsg')}")
+            return False
+            
+    except Exception as e:
+        print(f"发送文本消息时发生错误: {str(e)}")
+        return False
+
+
+def send_wechat_markdown_message(webhook_url, content):
+    """发送Markdown消息到企业微信群机器人"""
+    if not webhook_url or "key=" not in webhook_url:
+        print("企业微信群机器人Webhook地址配置不正确")
+        return False
+        
+    headers = {"Content-Type": "application/json"}
+    data = {
+        "msgtype": "markdown",
+        "markdown": {
+            "content": content
+        }
+    }
+    
+    try:
+        response = requests.post(webhook_url, json=data, headers=headers, timeout=10)
+        result = response.json()
+        if result.get("errcode") == 0:
+            print("Markdown消息发送成功")
+            return True
+        else:
+            print(f"Markdown消息发送失败: {result.get('errmsg')}")
+            return False
+    except Exception as e:
+        print(f"发送Markdown消息时发生错误: {str(e)}")
+        return False
+
+
+def format_vps_info_text(vps_list):
+    """格式化VPS信息为文本格式"""
+    current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    content = f"VPS状态检查报告 ({current_time})\n\n"
+    
+    # 分类统计
+    total = len(vps_list)
+    normal = sum(1 for vps in vps_list if 'status' not in vps)
+    error = total - normal
+    
+    content += f"统计: 共 {total} 个账号 | 正常: {normal} 个 | 异常: {error} 个\n\n"
+    
+    # 处理异常状态的VPS
+    if error > 0:
+        content += "异常账号:\n"
+        for vps in vps_list:
+            if 'status' in vps:
+                content += f"- {vps['account']}: {vps['status']}\n"
+        content += "\n"
+    
+    # 处理正常状态的VPS
+    normal_vps = [vps for vps in vps_list if 'status' not in vps]
+    normal_vps.sort(key=lambda x: x['days_left'] if x['days_left'] is not None else float('inf'))
+    
+    if normal_vps:
+        content += "正常账号:\n"
+        for vps in normal_vps:
+            expire_tag = ""
+            if vps['days_left'] is not None:
+                if vps['days_left'] <= 3:
+                    expire_tag = " ⚠️ 即将到期"
+                elif vps['days_left'] <= 7:
+                    expire_tag = " ⚠️ 7天内到期"
+            
+            content += f"- {vps['account']}\n"
+            content += f"  IP: {vps['ip']}\n"
+            content += f"  地区: {vps['location']}\n"
+            content += f"  近1月交易: {vps['transactions']} 笔\n"
+            content += f"  到期日: {vps['expire_date']} ({vps['days_left']}天){expire_tag}\n\n"
+    
+    return content
+
+
+def format_vps_info_markdown(vps_list):
+    """格式化VPS信息为Markdown格式"""
+    current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    content = f"### VPS状态检查报告 ({current_time})\n\n"
+    
+    # 分类统计
+    total = len(vps_list)
+    normal = sum(1 for vps in vps_list if 'status' not in vps)
+    error = total - normal
+    
+    content += f"📊 统计: 共 {total} 个账号 | 正常: {normal} 个 | 异常: {error} 个\n\n"
+    
+    # 处理异常状态的VPS
+    if error > 0:
+        content += "❌ **异常账号**\n"
+        for vps in vps_list:
+            if 'status' in vps:
+                content += f"- {vps['account']}: {vps['status']}\n"
+        content += "\n"
+    
+    # 处理正常状态的VPS
+    normal_vps = [vps for vps in vps_list if 'status' not in vps]
+    normal_vps.sort(key=lambda x: x['days_left'] if x['days_left'] is not None else float('inf'))
+    
+    if normal_vps:
+        content += "✅ **正常账号**\n"
+        for vps in normal_vps:
+            expire_tag = ""
+            if vps['days_left'] is not None:
+                if vps['days_left'] <= 3:
+                    expire_tag = " ⚠️ 即将到期"
+                elif vps['days_left'] <= 7:
+                    expire_tag = " ⚠️ 7天内到期"
+            
+            content += f"- {vps['account']}\n"
+            content += f"  - IP: {vps['ip']}\n"
+            content += f"  - 地区: {vps['location']}\n"
+            content += f"  - 近1月交易: {vps['transactions']} 笔\n"
+            content += f"  - 到期日: {vps['expire_date']} ({vps['days_left']}天){expire_tag}\n\n"
+    
+    return content
+
+
+def check_single_vps_with_retry(account_data, today):
+    """带重试机制的单个VPS检查"""
+    for attempt in range(RETRY_COUNT + 1):
+        try:
+            return check_single_vps(account_data, today, attempt)
+        except Exception as e:
+            if attempt < RETRY_COUNT:
+                print(f"检查 {account_data['remark']} 失败，正在重试 ({attempt + 1}/{RETRY_COUNT})...")
+                time.sleep(2** attempt)  # 指数退避
+            else:
+                return {
+                    'account': account_data['remark'],
+                    'status': f"多次尝试后失败: {str(e)}"
+                }
+
+
+def check_single_vps(account_data, today, attempt=0):
+    """检查单个VPS账号的状态"""
+    account_email = account_data['remark']
+    cookies = {'DJkdikKMG': account_data['DJkdikKMG']}
+
+    try:
+        # 随机延迟
+        delay = 1 + random.uniform(0, 2)
+        time.sleep(delay)
+        
+        # 模拟浏览器请求头
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+            'Accept-Language': 'zh-CN,zh;q=0.8,zh-TW;q=0.7,zh-HK;q=0.5,en-US;q=0.3,en;q=0.2'
+        }
+        
+        response = requests.get(
+            url, 
+            cookies=cookies, 
+            headers=headers,
+            allow_redirects=False, 
+            timeout=TIMEOUT
+        )
+
+        if response.status_code in (302, 403):
+            return {
+                'account': account_email,
+                'status': f"访问失败({response.status_code})，可能是Cookie失效"
+            }
+
+        if response.status_code == 200:
+            soup = BeautifulSoup(response.text, 'html.parser')
+            info_div = soup.find('div', class_='information-right')
+            if not info_div:
+                return {
+                    'account': account_email,
+                    'status': "未找到 VPS 信息"
+                }
+
+            info_items = {}
+            for item in info_div.find_all('div', class_='information-list-item'):
+                left = item.find('div', class_='information-list-item-left')
+                right = item.find('div', class_='information-list-item-right')
+                if left and right:
+                    key = left.get_text(strip=True)
+                    value = right.get_text(strip=True)
+                    info_items[key] = value
+
+            transactions = int(info_items.get('近1月实盘交易数量', '0'))
+            location = info_items.get('服务器地址', 'N/A')
+            expire_date_str = info_items.get('到期日期', 'N/A')
+            vps_ip = info_items.get('VPS IP', 'N/A')
+
+            emoji = LOCATION_EMOJIS.get(location, "")
+            if emoji:
+                location = f"{emoji} {location}"
+
+            days_left = None
+            if expire_date_str != 'N/A':
+                try:
+                    expire_date = datetime.strptime(expire_date_str, "%Y-%m-%d").date()
+                    days_left = (expire_date - today).days
+                except ValueError:
+                    pass
+
+            return {
+                'account': account_email,
+                'ip': vps_ip,
+                'location': location,
+                'transactions': transactions,
+                'expire_date': expire_date_str,
+                'days_left': days_left
+            }
+        else:
+            return {
+                'account': account_email,
+                'status': f"HTTP错误({response.status_code})"
+            }
+
+    except Exception as e:
+        raise Exception(f"HTTPS连接错误: {str(e)}")
+
 
 def check_vps_status():
-    stats = {
-        'total_accounts': len(cookies_list),
-        'active_vps': 0,
-        'inactive_accounts': 0,
-        'invalid_cookies': 0,
-        'no_vps_info': 0,
-        'invalid_cookies_list': [],
-        'no_vps_info_list': [],
-        'locations': {},
-        'expired': 0,
-        'expiring_urgent': 0,
-        'expiring_soon': 0,
-        'no_transactions': 0,
-        'low_transactions': 0,
-        'normal_transactions': 0,
-        'critical_vps': [],
-        'all_vps_details': []  # ✅ 所有账号信息
-    }
-
+    """多线程检查所有VPS状态"""
     today = datetime.now().date()
+    all_vps_details = []
+    
+    with ThreadPoolExecutor(max_workers=MAX_THREADS) as executor:
+        futures = {
+            executor.submit(check_single_vps_with_retry, account_data, today): 
+            account_data for account_data in cookies_list
+        }
+        
+        for future in as_completed(futures):
+            account_data = futures[future]
+            try:
+                result = future.result()
+                all_vps_details.append(result)
+                print(f"已完成检查: {account_data['remark']}")
+            except Exception as e:
+                print(f"处理 {account_data['remark']} 时发生错误: {str(e)}")
+    
+    return all_vps_details
 
-    for account_data in cookies_list:
-        account_email = account_data['remark']
-        cookies = {'DJkdikKMG': account_data['DJkdikKMG']}
-        try:
-            response = requests.get(url, cookies=cookies, allow_redirects=False)
-            if response.status_code == 302:
-                stats['no_vps_info'] += 1
-                stats['no_vps_info_list'].append(account_email)
-                continue
-            if response.status_code == 403:
-                stats['invalid_cookies'] += 1
-                stats['invalid_cookies_list'].append(account_email)
-                continue
-            if response.status_code == 200:
-                soup = BeautifulSoup(response.text, 'html.parser')
-                info_div = soup.find('div', class_='information-right')
-                if info_div:
-                    info_items = {}
-                    for item in info_div.find_all('div', class_='information-list-item'):
-                        key = item.find('div', class_='information-list-item-left').get_text(strip=True)
-                        value = item.find('div', class_='information-list-item-right').get_text(strip=True)
-                        info_items[key] = value
-                    transactions = int(info_items.get('近1月实盘交易数量', '0'))
-                    location = info_items.get('服务器地址', 'N/A')
-                    expire_date_str = info_items.get('到期日期', 'N/A')
-                    vps_ip = info_items.get('VPS IP', 'N/A')
-                    emoji = LOCATION_EMOJIS.get(location, "")
-                    if emoji:
-                        location = f"{emoji} {location}"
-                    stats['active_vps'] += 1
-                    transaction_status = ""
-                    if transactions == 0:
-                        stats['no_transactions'] += 1
-                        transaction_status = "❌无交易"
-                    elif transactions < 10:
-                        stats['low_transactions'] += 1
-                        transaction_status = "⚠️低交易"
-                    else:
-                        stats['normal_transactions'] += 1
-                        transaction_status = "✅正常"
-                    stats['locations'][location] = stats['locations'].get(location, 0) + 1
-                    expire_status = ""
-                    days_left = None
-                    if expire_date_str != 'N/A':
-                        try:
-                            expire_date = datetime.strptime(expire_date_str, "%Y-%m-%d").date()
-                            days_left = (expire_date - today).days
-                            if days_left < 0:
-                                stats['expired'] += 1
-                                expire_status = "❗❗已过期"
-                            elif days_left <= 3:
-                                stats['expiring_urgent'] += 1
-                                expire_status = "❗❗急需续费"
-                            elif days_left <= 7:
-                                stats['expiring_soon'] += 1
-                                expire_status = "❗需续费"
-                            else:
-                                expire_status = "✅正常"
-                        except ValueError:
-                            expire_status = "⏹️日期错误"
-                    problems = []
-                    if transaction_status != "✅正常":
-                        problems.append(f"交易: {transaction_status}({transactions})")
-                    if expire_status != "✅正常":
-                        problems.append(f"到期: {expire_status}")
-                        if days_left is not None:
-                            problems.append(f"剩余天数: {days_left}")
-                    if problems:
-                        stats['critical_vps'].append({
-                            'account': account_email,
-                            'ip': vps_ip,
-                            'location': location,
-                            'problems': problems
-                        })
-                    # ✅ 记录所有账号详情
-                    stats['all_vps_details'].append({
-                        'account': account_email,
-                        'ip': vps_ip,
-                        'location': location,
-                        'transactions': transactions,
-                        'expire_date': expire_date_str,
-                        'days_left': days_left,
-                        'transaction_status': transaction_status,
-                        'expire_status': expire_status
-                    })
-                else:
-                    stats['inactive_accounts'] += 1
-            else:
-                stats['inactive_accounts'] += 1
-        except Exception as e:
-            stats['inactive_accounts'] += 1
-        time.sleep(2)
-
-    today_str = today.strftime('%Y-%m-%d')
-    wechat_msg = f"""⏰ 天眼云VPS健康状态报告 {today_str}
-
-📊 基础统计
-总账号: {stats['total_accounts']}
-有效VPS: {stats['active_vps']}
-无效账号: {stats['inactive_accounts']}
-🚫 Cookies失效(403): {stats['invalid_cookies']}
-⚠️ 无法获取VPS信息(302): {stats['no_vps_info']}"""
-
-    if stats['invalid_cookies_list']:
-        wechat_msg += "\n\n🔴 Cookies失效账号列表(403):"
-        for account in stats['invalid_cookies_list']:
-            wechat_msg += f"\n• {account}"
-
-    wechat_msg += f"""
-
-🔢 交易量问题统计
-❌ 无交易: {stats['no_transactions']}
-⚠️ 低交易(0<x<10): {stats['low_transactions']}
-
-⏳ 到期问题统计
-急需续费(≤3天): {stats['expiring_urgent']}
-需续费(≤7天): {stats['expiring_soon']}
-
-🌍 地区分布
-""" + "\n".join([f"{loc}: {count}" for loc, count in stats['locations'].items()])
-
-    if stats['critical_vps']:
-        critical_report = "\n\n🚨 问题VPS列表\n"
-        for vps in stats['critical_vps']:
-            critical_report += f"""
-账号: {vps['account']}
-IP: {vps['ip']}
-地区: {vps['location']}"""
-            for problem in vps['problems']:
-                critical_report += f"\n{problem}"
-            critical_report += "\n"
-        wechat_msg += critical_report
-
-    # ✅ 添加所有账号信息
-    vps_details_text = "\n\n📄 所有账号VPS明细"
-    for vps in stats['all_vps_details']:
-        vps_details_text += f"""
-账号: {vps['account']}
-IP: {vps['ip']}
-地区: {vps['location']}
-交易状态: {vps['transaction_status']} ({vps['transactions']})
-到期状态: {vps['expire_status']} | 到期日: {vps['expire_date']}"""
-        if vps['days_left'] is not None:
-            vps_details_text += f" | 剩余: {vps['days_left']}天"
-        vps_details_text += "\n"
-    wechat_msg += vps_details_text
-
-    wechat_msg += f"\n\n⏱️ 统计时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
-    return wechat_msg
 
 if __name__ == "__main__":
-    try:
-        print("开始检查VPS状态...")
-        report = check_vps_status()
-        print("生成报告成功，正在发送企业微信通知...")
-        send_wechat_notification(report)
-        print("通知发送完成！")
-    except Exception as e:
-        error_msg = f"❌ VPS状态检查失败: {str(e)}"
-        print(error_msg)
-        send_wechat_notification(error_msg)
+    print("开始检查 VPS 状态...")
+    start_time = time.time()
+    
+    vps_list = check_vps_status()
+    
+    end_time = time.time()
+    print(f"检查完成，耗时: {end_time - start_time:.2f}秒，结果如下：")
+
+    # 打印控制台输出
+    for vps in vps_list:
+        if 'status' in vps:
+            print(f"[{vps['account']}] {vps['status']}")
+        else:
+            print(f"[{vps['account']}] IP: {vps['ip']} | 地区: {vps['location']} | 交易量: {vps['transactions']} | 到期: {vps['expire_date']} | 剩余: {vps['days_left']}天")
+    
+    # 发送到企业微信群机器人
+    print("\n准备发送到企业微信群...")
+    if MESSAGE_TYPE == "text":
+        wechat_content = format_vps_info_text(vps_list)
+        send_wechat_text_message(WEBHOOK_URL, wechat_content)
+    else:
+        wechat_content = format_vps_info_markdown(vps_list)
+        send_wechat_markdown_message(WEBHOOK_URL, wechat_content)
+    
