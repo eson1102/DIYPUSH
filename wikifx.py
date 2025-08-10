@@ -4,6 +4,7 @@ import time
 from datetime import datetime
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import random
+from collections import OrderedDict
 
 LOCATION_EMOJIS = {
     "香港": "🇭🇰", "新加坡": "🇸🇬", "美国": "🇺🇸", "日本": "🇯🇵",
@@ -21,8 +22,7 @@ url = "https://vps.wikifx.com/zh-cn/jyzh"
 MAX_THREADS = 3
 TIMEOUT = 15
 RETRY_COUNT = 2
-# 消息类型: "text" 或 "markdown"
-MESSAGE_TYPE = "text"  # 可切换为"markdown"使用富文本格式
+MESSAGE_TYPE = "text"  # "text" 或 "markdown"
 
 cookies_list = [
     {
@@ -51,10 +51,7 @@ def send_wechat_text_message(webhook_url, content):
         print("无效的Webhook地址，必须包含key参数")
         return False
         
-    headers = {
-        "Content-Type": "application/json"
-    }
-    
+    headers = {"Content-Type": "application/json"}
     data = {
         "msgtype": "text",
         "text": {
@@ -194,16 +191,21 @@ def format_vps_info_markdown(vps_list):
 
 def check_single_vps_with_retry(account_data, today):
     """带重试机制的单个VPS检查"""
+    account_email = account_data['remark']  # 保存账号信息用于验证
     for attempt in range(RETRY_COUNT + 1):
         try:
-            return check_single_vps(account_data, today, attempt)
+            result = check_single_vps(account_data, today, attempt)
+            # 验证返回结果中的账号与当前处理的账号一致
+            if result.get('account') != account_email:
+                raise ValueError(f"数据错乱: 预期账号 {account_email}, 实际返回 {result.get('account')}")
+            return result
         except Exception as e:
             if attempt < RETRY_COUNT:
-                print(f"检查 {account_data['remark']} 失败，正在重试 ({attempt + 1}/{RETRY_COUNT})...")
-                time.sleep(2** attempt)  # 指数退避
+                print(f"检查 {account_email} 失败，正在重试 ({attempt + 1}/{RETRY_COUNT})...")
+                time.sleep(2 **attempt)  # 指数退避
             else:
                 return {
-                    'account': account_data['remark'],
+                    'account': account_email,
                     'status': f"多次尝试后失败: {str(e)}"
                 }
 
@@ -293,9 +295,17 @@ def check_single_vps(account_data, today, attempt=0):
 
 
 def check_vps_status():
-    """多线程检查所有VPS状态"""
+    """多线程检查所有VPS状态，确保结果顺序与输入一致"""
     today = datetime.now().date()
-    all_vps_details = []
+    # 使用OrderedDict确保结果顺序与输入账号顺序一致
+    results = OrderedDict()
+    
+    # 初始化所有账号的结果为"处理中"
+    for account_data in cookies_list:
+        results[account_data['remark']] = {
+            'account': account_data['remark'],
+            'status': "处理中"
+        }
     
     with ThreadPoolExecutor(max_workers=MAX_THREADS) as executor:
         futures = {
@@ -305,14 +315,24 @@ def check_vps_status():
         
         for future in as_completed(futures):
             account_data = futures[future]
+            account_email = account_data['remark']
             try:
                 result = future.result()
-                all_vps_details.append(result)
-                print(f"已完成检查: {account_data['remark']}")
+                # 验证结果账号与当前账号匹配
+                if result.get('account') != account_email:
+                    raise ValueError(f"数据错乱: 预期账号 {account_email}, 实际返回 {result.get('account')}")
+                results[account_email] = result
+                print(f"已完成检查: {account_email}")
             except Exception as e:
-                print(f"处理 {account_data['remark']} 时发生错误: {str(e)}")
+                error_msg = f"处理 {account_email} 时发生错误: {str(e)}"
+                print(error_msg)
+                results[account_email] = {
+                    'account': account_email,
+                    'status': error_msg
+                }
     
-    return all_vps_details
+    # 按原始顺序返回结果列表
+    return list(results.values())
 
 
 if __name__ == "__main__":
@@ -324,7 +344,7 @@ if __name__ == "__main__":
     end_time = time.time()
     print(f"检查完成，耗时: {end_time - start_time:.2f}秒，结果如下：")
 
-    # 打印控制台输出
+    # 打印控制台输出（按输入顺序）
     for vps in vps_list:
         if 'status' in vps:
             print(f"[{vps['account']}] {vps['status']}")
