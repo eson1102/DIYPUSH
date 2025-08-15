@@ -11,8 +11,7 @@ telegram_token = os.environ["BOT_TOKEN"]
 telegram_chat_id = os.environ["CHAT_ID"]
 
 # 使用请求库获取 ini 文件的内容
-response = requests.get(
-    "https://cfdingyue-4lu.pages.dev/a5ce27a6-76df-48da-be62-493fbda9a3af?clash",
+response = requests.get( "https://subapi.cmliussss.net/sub?&url=https%3A%2F%2Fliangxin.xyz%2Fapi%2Fv1%2Fliangxin%3FOwO%3D157455d98344480a62661bfeeb739607&target=clash&emoji=true&append_type=true&append_info=true&scv=false&udp=false&list=false&sort=false&fdn=false&insert=false",
     timeout=200
 )
 
