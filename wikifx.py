@@ -40,6 +40,10 @@ cookies_list = [
     {
         'DJkdikKMG': 'ncK4Do%2fFX08LfUpcy2Vuog%3d%3d%7cbh91%7chttps%3a%2f%2fimg.fx696.com%2fWikiEnterprise%2fsign%2fpersonph.png_wiki-template-global%7c9575322624%7cddb7515da1b345f9e4c3f14192cbb265',
         'remark': 'iijoidpfdc@iubridge.com'
+    },
+    {
+        'DJkdikKMG': 'PPgySUq%252bC8tOjdWsbRettQ%253d%253d%257ctom8726%257chttps%253a%252f%252fimg.fx696.com%252fWikiEnterprise%252fsign%252fpersonph.png_wiki-template-global%257c0894536175%257c9dc2fc1e8a413253278a04294de1c34d',
+        'remark': 'bjtuunopmv@iubridge.com'
     }
     # 添加更多账号的cookies和备注
 ]
