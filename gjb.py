@@ -84,7 +84,7 @@ except Exception as e:
     end_time_content = fallback_end_time_content
 
 # 输出获取的信息
-print("订单编号:", order_id)
+print("挂机编号:", order_id)
 print("服务到期时间:", end_time_content)
 
 # 提取到期时间（日期部分）
@@ -94,14 +94,14 @@ end_time_date = date_match.group(0) if date_match else "未知到期时间"
 # 检查通知条件并合并通知逻辑
 notification = None
 if "小时" in end_time_content:
-    notification = f"通知：订单 {order_id} 的服务将于 {end_time_date} 到期，请注意！"
+    notification = f"挂机通知：订单 {order_id} 的服务将于 {end_time_date} 到期，请注意！"
 else:
     # 检查是否包含“剩余x天”，并提取 x
     days_match = re.search(r'剩余([\d.]+)天', end_time_content)
     if days_match:
         remaining_days = float(days_match.group(1))
         if remaining_days < 7:
-            notification = f"提醒：订单 {order_id} 的服务将于 {end_time_date} 到期，剩余 {remaining_days} 天，小于 7 天，请尽快处理！"
+            notification = f"挂机提醒：订单 {order_id} 的服务将于 {end_time_date} 到期，剩余 {remaining_days} 天，小于 7 天，请尽快处理！"
 
 # 发送企业微信通知（如果有）
 if notification:
