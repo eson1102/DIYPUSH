@@ -42,11 +42,11 @@ cookies_list = [
         'remark': 'iijoidpfdc@iubridge.com'
     },
     {
-        'DJkdikKMG': 'PPgySUq%252bC8tOjdWsbRettQ%253d%253d%257ctom8726%257chttps%253a%252f%252fimg.fx696.com%252fWikiEnterprise%252fsign%252fpersonph.png_wiki-template-global%257c0894536175%257c9dc2fc1e8a413253278a04294de1c34d',
+        'DJkdikKMG': 'PPgySUq%2bC8tOjdWsbRettQ%3d%3d%7ctom8726%7chttps%3a%2f%2fimg.zy223.com%2fWikiEnterprise%2fsign%2fpersonph.png_wiki-template-global%7c0805942216%7cca46820f45972511a3caba249858f92b',
         'remark': 'bjtuunopmv@iubridge.com'
     },
         {
-        'DJkdikKMG': 'nZ%2fREPYCNY4jChEq2TyhJQ%3d%3d%7cttt2655%7chttps%3a%2f%2fimg.zy223.com%2fWikiEnterprise%2fsign%2fpersonph.png_wiki-template-global%7c4898986045%7c88647a91def4a03a9c251cba945510cf',
+        'DJkdikKMG': 'nZ%2fREPYCNY4jChEq2TyhJQ%3d%3d%7cttt2655%7chttps%3a%2f%2fimg.zy223.com%2fWikiEnterprise%2fsign%2fpersonph.png_wiki-template-global%7c4898688470%7c54d0d46ee282d147e8b775914a53a746',
         'remark': 'pyjangubwq@iubridge.com'
     }
     # 添加更多账号的cookies和备注
