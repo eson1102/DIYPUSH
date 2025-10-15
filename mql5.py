@@ -1,17 +1,15 @@
 import requests
 from bs4 import BeautifulSoup
 import json
-import time
 import os
 
-# ========== 配置部分 ==========
+# ========== 配置部分（同原代码，需确保WEBHOOK_URL正确） ==========
 AUTHOR_URL = "https://www.mql5.com/zh/signals/author/wanbaolu"
-WEBHOOK_URL = "https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=5efc99e5-42a6-4da8-abe9-80158d9b38cf"  # ⚠️替换为你的企业微信 Webhook key
+WEBHOOK_URL = "https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=5efc99e5-42a6-4da8-abe9-80158d9b38cf"  # 替换为你的Webhook key
 DATA_FILE = "mql5_subscribers.json"
-CHECK_INTERVAL = 3600  # 每隔 1 小时检测一次（单位：秒）
 USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"
 
-# ========== 企业微信推送 ==========
+# ========== 企业微信推送（同原代码） ==========
 def send_wechat_message(content):
     data = {"msgtype": "text", "text": {"content": content}}
     try:
@@ -21,7 +19,7 @@ def send_wechat_message(content):
     except Exception as e:
         print(f"❌ 推送异常: {e}")
 
-# ========== 抓取信号信息 ==========
+# ========== 抓取信号信息（同原代码） ==========
 def fetch_signals():
     headers = {"User-Agent": USER_AGENT}
     html = requests.get(AUTHOR_URL, headers=headers, timeout=15).text
@@ -45,7 +43,7 @@ def fetch_signals():
 
     return signals
 
-# ========== 读取与保存本地状态 ==========
+# ========== 读取与保存本地状态（同原代码） ==========
 def load_last_state():
     if not os.path.exists(DATA_FILE):
         return {}
@@ -56,9 +54,9 @@ def save_state(data):
     with open(DATA_FILE, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
 
-# ========== 主逻辑 ==========
+# ========== 主逻辑（同原代码） ==========
 def main():
-    print("🔍 正在检查 MQL5 韭菜变化...")
+    print("🔍 正在检查 MQL5 订阅者变化...")
     current_data = fetch_signals()
     last_data = load_last_state()
 
@@ -73,7 +71,7 @@ def main():
         url = info["url"]
         old_info = last_data.get(name)
         if not old_info:
-            changes.append(f"🆕 新增信号《{name}》\n📍韭菜：{subs} 人\n🔗 {url}")
+            changes.append(f"🆕 新增信号《{name}》\n📍订阅者：{subs} 人\n🔗 {url}")
         else:
             old_subs = old_info["subs"]
             if subs != old_subs:
@@ -82,7 +80,7 @@ def main():
                 changes.append(f"《{name}》{arrow} {abs(diff)} 人 → 当前 {subs} 人\n🔗 {url}")
 
     if changes:
-        summary = f"📢 MQL5 韭菜变动提醒\n\n本次检测共有 {len(changes)} 个信号发生变化。\n\n—— 详细变动如下 ——\n\n"
+        summary = f"📢 MQL5 订阅者变动提醒\n\n本次检测共有 {len(changes)} 个信号发生变化。\n\n—— 详细变动如下 ——\n\n"
         msg = summary + "\n\n".join(changes)
         print(msg)
         send_wechat_message(msg)
@@ -91,12 +89,9 @@ def main():
 
     save_state(current_data)
 
-# ========== 循环运行 ==========
+# ========== 单次运行（删除while循环，直接执行main） ==========
 if __name__ == "__main__":
-    while True:
-        try:
-            main()
-        except Exception as e:
-            print(f"❗ 执行错误: {e}")
-        print("⏳ 等待下一次检测...\n")
-        time.sleep(CHECK_INTERVAL)
+    try:
+        main()
+    except Exception as e:
+        print(f"❗ 执行错误: {e}")
