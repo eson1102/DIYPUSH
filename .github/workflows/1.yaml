@@ -32,3 +32,4 @@ jobs:
         BUCKET: ${{ secrets.BUCKET }}
       run: |
         # python clashupdate.py
+        python mql5.py
