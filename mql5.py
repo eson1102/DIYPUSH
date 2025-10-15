@@ -6,7 +6,7 @@ import os
 
 # ========== 配置部分 ==========
 AUTHOR_URL = "https://www.mql5.com/zh/signals/author/wanbaolu"
-WEBHOOK_URL = ""  # ⚠️替换为你的企业微信 Webhook key
+WEBHOOK_URL = "https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=5efc99e5-42a6-4da8-abe9-80158d9b38cf"  # ⚠️替换为你的企业微信 Webhook key
 DATA_FILE = "mql5_subscribers.json"
 CHECK_INTERVAL = 3600  # 每隔 1 小时检测一次（单位：秒）
 USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"
