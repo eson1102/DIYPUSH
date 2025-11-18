@@ -3,7 +3,7 @@ name: 每周5星新闻提醒
 on:
   schedule:
     # Runs every Monday at 00:00 (midnight) UTC
-    - cron: '0 0 * * 1'
+    #- cron: '0 0 * * 1'
   workflow_dispatch:  # 手动触发
 
 jobs:
@@ -28,4 +28,4 @@ jobs:
           telegram_chat_id: ${{ secrets.telegram_chat_id }}  # 从 GitHub Secrets 获取 Webhook
           wechat_webhook_url1: ${{ secrets.wechat_webhook_url1 }}  # 从 GitHub Secrets 获取 Webhook
           wechat_webhook_url2: ${{ secrets.wechat_webhook_url2 }}  # 从 GitHub Secrets 获取 Webhook
-        #run: python weeknews.py
+        run: python weeknews.py
