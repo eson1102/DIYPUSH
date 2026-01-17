@@ -12,61 +12,67 @@ on:
         default: false
         required: false
 
+# 设置环境变量
+env:
+  PYTHONUNBUFFERED: 1
+  TZ: Asia/Shanghai
+
 jobs:
-  check-vps:
+  monitor:
+    name: Monitor VPS Status
     runs-on: ubuntu-latest
-    continue-on-error: true  # 即使有错误也继续执行，不会标记为失败
     
     steps:
     - name: Checkout repository
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
       
     - name: Set up Python
-      uses: actions/setup-python@v4
+      uses: actions/setup-python@v5
       with:
-        python-version: '3.9'
+        python-version: '3.10'
+        cache: 'pip'
         
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
-        pip install requests beautifulsoup4 prettytable
+        pip install -r requirements.txt
         
     - name: Run VPS Monitor
       id: monitor
       env:
         WECHAT_WEBHOOK_URL111: ${{ secrets.WECHAT_WEBHOOK_URL111 }}
       run: |
-        python vps_monitor_fixed.py
-        
-    - name: Check for errors
-      if: always()
-      run: |
-        # 这里可以添加错误检查逻辑
-        echo "检查完成"
+        python wikifx.py
         
     - name: Create summary file
       if: always()
       run: |
-        echo "# VPS监控报告" > summary.md
-        echo "运行时间: $(date)" >> summary.md
-        echo "工作流: ${{ github.workflow }}" >> summary.md
-        echo "触发方式: ${{ github.event_name }}" >> summary.md
-        echo "" >> summary.md
-        echo "更多详细信息请查看运行日志。" >> summary.md
+        # 创建总结文件
+        echo "# VPS监控报告" > SUMMARY.md
+        echo "" >> SUMMARY.md
+        echo "## 执行信息" >> SUMMARY.md
+        echo "- **运行时间:** $(date '+%Y-%m-%d %H:%M:%S')" >> SUMMARY.md
+        echo "- **工作流:** ${{ github.workflow }}" >> SUMMARY.md
+        echo "- **触发方式:** ${{ github.event_name }}" >> SUMMARY.md
+        echo "- **仓库:** ${{ github.repository }}" >> SUMMARY.md
+        echo "- **提交:** ${{ github.sha }}" >> SUMMARY.md
+        echo "" >> SUMMARY.md
+        echo "## 检查状态" >> SUMMARY.md
+        echo "脚本已执行完成。" >> SUMMARY.md
+        echo "" >> SUMMARY.md
+        echo "详细日志请查看运行输出。" >> SUMMARY.md
         
     - name: Upload summary
       if: always()
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: vps-monitor-summary
-        path: summary.md
+        path: SUMMARY.md
+        retention-days: 7
         
-    - name: Send success notification
-      if: success() && github.event_name != 'schedule' && !inputs.skip_notification
+    - name: Complete workflow
+      if: always()
       run: |
-        echo "✅ VPS监控手动执行成功"
-        
-    - name: Send failure notification
-      if: failure() && github.event_name != 'schedule' && !inputs.skip_notification
-      run: |
-        echo "❌ VPS监控执行失败"
+        echo "🎉 VPS监控工作流执行完成"
+        echo "运行时间: $(date)"
+        echo "事件类型: ${{ github.event_name }}"
