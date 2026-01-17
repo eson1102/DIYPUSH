@@ -1,15 +1,8 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-"""
-VPS 状态监控脚本（WikiFX）
-企业微信文本通知版
-消息模板严格按指定格式输出
-"""
-
 import requests
 from bs4 import BeautifulSoup
-import time
 from datetime import datetime
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import os
@@ -17,15 +10,11 @@ import sys
 from dataclasses import dataclass
 from typing import List, Dict
 
-# ==================== 基本配置 ====================
-
 VPS_URL = "https://vps.wikifx.com/zh-cn/jyzh"
 TIMEOUT = 15
 MAX_THREADS = 3
 
 WEBHOOK_URL = os.getenv("WECHAT_WEBHOOK_URL111", "")
-
-# ==================== Cookies（按你要求写死在脚本里） ====================
 
 COOKIES_CONFIG = [
     {
@@ -42,32 +31,23 @@ COOKIES_CONFIG = [
     }
 ]
 
-# ==================== 数据结构 ====================
-
 @dataclass
 class VPSResult:
     account: str
     success: bool
     error: str = ""
-
-# ==================== 核心检查 ====================
+    info: str = ""
 
 def check_single_vps(account_data: Dict) -> VPSResult:
     account = account_data["remark"]
     cookie = account_data["DJkdikKMG"]
 
-    headers = {
-        "User-Agent": "Mozilla/5.0 Chrome/120",
-        "Accept-Language": "zh-CN,zh;q=0.9"
-    }
-
     try:
         r = requests.get(
             VPS_URL,
-            headers=headers,
+            headers={"User-Agent": "Mozilla/5.0"},
             cookies={"DJkdikKMG": cookie},
-            timeout=TIMEOUT,
-            allow_redirects=True
+            timeout=TIMEOUT
         )
 
         if r.status_code != 200:
@@ -75,16 +55,13 @@ def check_single_vps(account_data: Dict) -> VPSResult:
 
         soup = BeautifulSoup(r.text, "html.parser")
 
-        # 只认这一层结构
         if not soup.find("div", class_="information"):
             return VPSResult(account, False, "页面不包含VPS信息")
 
-        return VPSResult(account, True)
+        return VPSResult(account, True, info="VPS页面正常")
 
     except Exception:
         return VPSResult(account, False, "页面不包含VPS信息")
-
-# ==================== 并发执行 ====================
 
 def check_all_vps() -> List[VPSResult]:
     results = []
@@ -94,59 +71,50 @@ def check_all_vps() -> List[VPSResult]:
             results.append(f.result())
     return results
 
-# ==================== 企业微信模板（严格对齐） ====================
-
 def format_wechat_message(results: List[VPSResult]) -> str:
     now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
-    total = len(results)
-    success_count = sum(1 for r in results if r.success)
-    error_count = total - success_count
+    success_list = [r for r in results if r.success]
+    error_list = [r for r in results if not r.success]
 
     lines = []
     lines.append(f"🚀 VPS状态检查报告 ({now})\n")
-    lines.append(f"📊 状态: {success_count}正常 {error_count}异常\n")
+    lines.append(f"📊 状态: {len(success_list)}正常 {len(error_list)}异常\n")
 
-    if error_count > 0:
+    if success_list:
+        lines.append("✅ 正常账号:")
+        for r in success_list:
+            lines.append(f"  • {r.account}: {r.info}")
+        lines.append("")
+
+    if error_list:
         lines.append("❌ 异常账号:")
-        for r in results:
-            if not r.success:
-                lines.append(f"  • {r.account}: {r.error}")
+        for r in error_list:
+            lines.append(f"  • {r.account}: {r.error}")
         lines.append("")
 
     lines.append("📅 检查完成")
 
     if "GITHUB_ACTIONS" in os.environ:
-        run_number = os.getenv("GITHUB_RUN_NUMBER", "")
-        lines.append(f"🔗 详情: GitHub Actions #{run_number}")
+        lines.append(f"🔗 详情: GitHub Actions #{os.getenv('GITHUB_RUN_NUMBER')}")
 
     return "\n".join(lines)
-
-# ==================== 企业微信发送 ====================
 
 def send_wechat(content: str):
     if not WEBHOOK_URL:
         print(content)
         return
-
     requests.post(
         WEBHOOK_URL,
-        json={
-            "msgtype": "text",
-            "text": {"content": content}
-        },
+        json={"msgtype": "text", "text": {"content": content}},
         timeout=10
     )
-
-# ==================== 主入口 ====================
 
 def main():
     results = check_all_vps()
     message = format_wechat_message(results)
     send_wechat(message)
-
-    # 只要有一个成功，就返回 0
-    return 0 if any(r.success for r in results) else 1
+    return 0 if results else 1
 
 if __name__ == "__main__":
     sys.exit(main())
