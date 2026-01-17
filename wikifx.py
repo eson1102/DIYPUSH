@@ -9,7 +9,7 @@ import sys
 import json
 
 # 从环境变量或secrets获取配置
-WEBHOOK_URL = os.getenv('WECHAT_WEBHOOK_URL', '')
+WEBHOOK_URL = os.getenv('WECHAT_WEBHOOK_URL111', '')
 
 # Cookies配置 - 从环境变量或直接在代码中
 COOKIES_CONFIG = [
