@@ -1,17 +1,28 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+VPS状态监控脚本 - 适配GitHub Actions
+检查多个VPS账号状态并通过企业微信机器人发送通知
+"""
+
 import requests
 from bs4 import BeautifulSoup
 import time
-from datetime import datetime
+from datetime import datetime, timedelta
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import random
 import os
 import sys
 import json
+from dataclasses import dataclass
+from typing import Dict, List, Optional, Tuple
+import re
 
-# 从环境变量或secrets获取配置
+# ==================== 配置区域 ====================
+# 从环境变量获取Webhook URL
 WEBHOOK_URL = os.getenv('WECHAT_WEBHOOK_URL111', '')
 
-# Cookies配置
+# VPS账号配置 - 可以放在环境变量或secrets中
 COOKIES_CONFIG = [
     {
         'DJkdikKMG': '6OqTtw%2bzch7fL2BJvNgHLQ%3d%3d%7cFX3565537695%7chttps%3a%2f%2fimg.zy223.com%2fWikiEnterprise%2fsign%2fpersonph.png_wiki-template-global%7c5922813873%7cc8020fbb721af53c164569793d0c012f',
@@ -34,33 +45,52 @@ VPS_URL = "https://vps.wikifx.com/zh-cn/jyzh"
 MAX_THREADS = 3
 TIMEOUT = 15
 RETRY_COUNT = 2
+DELAY_BETWEEN_REQUESTS = 1  # 基础延迟秒数
 
+# ==================== 数据类 ====================
+@dataclass
+class VPSResult:
+    """VPS检查结果数据类"""
+    account: str
+    success: bool
+    ip: str = "N/A"
+    location: str = "N/A"
+    transactions: int = 0
+    expire_date: str = ""
+    days_left: Optional[int] = None
+    error: str = ""
+    check_time: str = ""
 
-def log_message(message, level="INFO"):
-    """简单的日志函数"""
+# ==================== 日志函数 ====================
+def log_message(message: str, level: str = "INFO"):
+    """统一的日志函数"""
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    level_icon = {
+    icons = {
         "INFO": "ℹ️",
         "WARNING": "⚠️",
         "ERROR": "❌",
-        "SUCCESS": "✅"
-    }.get(level, "")
+        "SUCCESS": "✅",
+        "DEBUG": "🐛"
+    }
     
-    log_line = f"[{timestamp}] {level_icon} {message}"
+    icon = icons.get(level, "")
+    log_line = f"[{timestamp}] {icon} {message}"
     
-    # 根据级别输出到不同的流
+    # GitHub Actions 特殊格式
     if level == "ERROR":
-        print(log_line, file=sys.stderr)
+        print(f"::error::{message}")
     elif level == "WARNING":
-        print(log_line, file=sys.stderr)
+        print(f"::warning::{message}")
+    elif level == "INFO":
+        print(log_line)
     else:
-        print(log_line, file=sys.stdout)
+        print(log_line)
 
-
-def send_wechat_message(webhook_url, content, is_markdown=True):
-    """发送消息到企业微信群机器人"""
-    if not webhook_url:
-        log_message("未配置Webhook URL，跳过发送", "WARNING")
+# ==================== 企业微信通知 ====================
+def send_wechat_message(content: str, is_markdown: bool = True) -> bool:
+    """发送消息到企业微信机器人"""
+    if not WEBHOOK_URL:
+        log_message("未配置企业微信Webhook URL，跳过发送通知", "WARNING")
         return False
     
     headers = {"Content-Type": "application/json"}
@@ -77,132 +107,216 @@ def send_wechat_message(webhook_url, content, is_markdown=True):
         }
     
     try:
-        response = requests.post(webhook_url, json=data, headers=headers, timeout=10)
+        response = requests.post(WEBHOOK_URL, json=data, headers=headers, timeout=10)
         result = response.json()
         
         if result.get("errcode") == 0:
-            log_message("消息发送成功", "SUCCESS")
+            log_message("企业微信通知发送成功", "SUCCESS")
             return True
         else:
-            log_message(f"消息发送失败: {result.get('errmsg')}", "ERROR")
+            log_message(f"企业微信通知发送失败: {result.get('errmsg')}", "ERROR")
             return False
             
     except Exception as e:
-        log_message(f"发送消息时发生错误: {str(e)}", "ERROR")
+        log_message(f"发送企业微信通知时出错: {str(e)}", "ERROR")
         return False
 
+# ==================== 格式化函数 ====================
+def format_duration(seconds: float) -> str:
+    """格式化时间间隔"""
+    if seconds < 60:
+        return f"{seconds:.2f}秒"
+    elif seconds < 3600:
+        return f"{seconds/60:.1f}分钟"
+    else:
+        return f"{seconds/3600:.1f}小时"
 
-def format_vps_info(vps_list):
-    """格式化VPS信息"""
+def format_vps_report(results: List[VPSResult]) -> str:
+    """格式化VPS检查报告为Markdown格式"""
     current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     
-    # 分类统计
-    total = len(vps_list)
-    normal = sum(1 for vps in vps_list if vps.get('success', False))
-    error = total - normal
+    # 统计信息
+    total = len(results)
+    success_count = sum(1 for r in results if r.success)
+    error_count = total - success_count
+    success_rate = (success_count / total * 100) if total > 0 else 0
     
-    # 创建Markdown格式内容
-    content = f"## 📊 VPS状态检查报告 ({current_time})\n\n"
-    content += f"**统计:** 共 {total} 个账号 | ✅ 正常: {normal} 个 | ❌ 异常: {error} 个\n\n"
+    # 构建报告
+    report = [
+        f"## 📊 VPS状态监控报告",
+        f"",
+        f"**检查时间:** {current_time}",
+        f"**检查账号:** {total} 个",
+        f"**成功检查:** {success_count} 个",
+        f"**失败检查:** {error_count} 个",
+        f"**成功率:** {success_rate:.1f}%",
+        f""
+    ]
     
-    # 处理异常状态的VPS
-    if error > 0:
-        content += "### ❌ 异常账号\n"
-        for vps in vps_list:
-            if not vps.get('success', False):
-                error_msg = vps.get('error', '未知错误')
-                content += f"- **{vps['account']}**: {error_msg}\n"
-        content += "\n"
+    # 失败账号列表
+    if error_count > 0:
+        report.append("### ❌ 检查失败的账号")
+        for result in results:
+            if not result.success:
+                report.append(f"- **{result.account}**: {result.error}")
+        report.append("")
     
-    # 处理正常状态的VPS
-    normal_vps = [vps for vps in vps_list if vps.get('success', False)]
-    
-    if normal_vps:
+    # 成功账号详情
+    if success_count > 0:
+        report.append("### ✅ 正常运行的VPS")
+        
         # 按剩余天数排序
-        normal_vps.sort(key=lambda x: x.get('days_left', 9999))
+        successful_results = [r for r in results if r.success]
+        successful_results.sort(key=lambda x: x.days_left if x.days_left is not None else 9999)
         
-        content += "### ✅ 正常账号\n"
+        for result in successful_results:
+            # 添加状态标识
+            status_icon = "🟢"
+            status_note = ""
+            
+            if result.days_left is not None:
+                if result.days_left < 0:
+                    status_icon = "🔴"
+                    status_note = f"（已过期 {-result.days_left}天）"
+                elif result.days_left <= 3:
+                    status_icon = "🟠"
+                    status_note = "（即将到期）"
+                elif result.days_left <= 7:
+                    status_icon = "🟡"
+                    status_note = "（7天内到期）"
+                elif result.days_left <= 30:
+                    status_note = "（30天内到期）"
+            
+            report.append(f"#### {status_icon} {result.account}{status_note}")
+            report.append(f"- **IP地址:** `{result.ip}`")
+            report.append(f"- **服务器地区:** {result.location}")
+            report.append(f"- **近1月交易量:** {result.transactions:,} 笔")
+            
+            if result.expire_date:
+                days_info = f"剩余 {result.days_left} 天" if result.days_left is not None else ""
+                report.append(f"- **到期时间:** {result.expire_date} {days_info}")
+            
+            report.append(f"- **检查时间:** {result.check_time}")
+            report.append("")
+    
+    # GitHub Actions 信息
+    if "GITHUB_ACTIONS" in os.environ:
+        run_id = os.getenv("GITHUB_RUN_ID", "")
+        run_number = os.getenv("GITHUB_RUN_NUMBER", "")
+        if run_id:
+            run_url = f"https://github.com/{os.getenv('GITHUB_REPOSITORY', '')}/actions/runs/{run_id}"
+            report.append(f"**工作流运行:** [#{run_number}]({run_url})")
+    
+    report.append("---")
+    report.append("*本报告由GitHub Actions自动生成*")
+    
+    return "\n".join(report)
+
+def print_simple_table(results: List[VPSResult]):
+    """打印简单的表格输出"""
+    print("\n" + "="*90)
+    print("VPS状态检查汇总".center(90))
+    print("="*90)
+    
+    # 表头
+    print(f"{'账号':<30} {'状态':<10} {'IP地址':<20} {'交易量':<8} {'剩余天数':<10} {'备注':<20}")
+    print("-" * 90)
+    
+    for result in results:
+        account = result.account
+        status = "✅ 正常" if result.success else "❌ 异常"
+        ip = result.ip if result.success else "-"
+        transactions = str(result.transactions) if result.success else "-"
         
-        for vps in normal_vps:
-            # 添加到期警告
-            warnings = []
-            days_left = vps.get('days_left')
-            
-            if days_left is not None:
-                if days_left <= 3:
-                    warnings.append("⚠️ **即将到期**")
-                elif days_left <= 7:
-                    warnings.append("⚠️ 7天内到期")
-                elif days_left <= 30:
-                    warnings.append("⏳ 30天内到期")
-            
-            warning_text = " ".join(warnings)
-            if warning_text:
-                warning_text = f" {warning_text}"
-            
-            content += f"#### {vps['account']}{warning_text}\n"
-            content += f"- **IP:** `{vps.get('ip', 'N/A')}`\n"
-            content += f"- **地区:** {vps.get('location', 'N/A')}\n"
-            content += f"- **近1月交易:** {vps.get('transactions', 0)} 笔\n"
-            
-            if vps.get('expire_date'):
-                content += f"- **到期日:** {vps['expire_date']} "
-                if days_left is not None:
-                    if days_left < 0:
-                        content += f"(已过期 {-days_left}天) ❌"
-                    else:
-                        content += f"(剩余 {days_left}天)"
-                content += "\n"
-            
-            content += "\n"
+        if result.success and result.days_left is not None:
+            if result.days_left < 0:
+                days_left = f"过期{-result.days_left}"
+                remark = "已过期"
+            elif result.days_left <= 3:
+                days_left = str(result.days_left)
+                remark = "⚠️即将到期"
+            elif result.days_left <= 7:
+                days_left = str(result.days_left)
+                remark = "7天内到期"
+            elif result.days_left <= 30:
+                days_left = str(result.days_left)
+                remark = "30天内到期"
+            else:
+                days_left = str(result.days_left)
+                remark = ""
+        else:
+            days_left = "-"
+            remark = result.error if not result.success else ""
+        
+        print(f"{account:<30} {status:<10} {ip:<20} {transactions:<8} {days_left:<10} {remark:<20}")
     
-    # 添加摘要信息
-    content += "---\n"
-    content += f"**检查时间:** {current_time}\n"
-    content += "**触发方式:** GitHub Actions\n"
-    content += f"**成功率:** {normal}/{total} ({normal/total*100:.1f}%)"
+    print("-" * 90)
     
-    return content
+    # 统计信息
+    total = len(results)
+    success_count = sum(1 for r in results if r.success)
+    error_count = total - success_count
+    
+    print(f"📊 统计: 共检查 {total} 个账号 | ✅ 正常: {success_count} 个 | ❌ 异常: {error_count} 个")
+    
+    if error_count > 0:
+        print(f"⚠️  注意: 有 {error_count} 个账号检查失败，可能是Cookie已失效")
+    
+    print("=" * 90)
 
-
-def parse_vps_info(soup):
+# ==================== 核心检查函数 ====================
+def parse_vps_page(html: str) -> Optional[Dict]:
     """解析VPS信息页面"""
-    info_div = soup.find('div', class_='information-right')
-    if not info_div:
+    try:
+        soup = BeautifulSoup(html, 'html.parser')
+        info_div = soup.find('div', class_='information-right')
+        
+        if not info_div:
+            return None
+        
+        info_items = {}
+        for item in info_div.find_all('div', class_='information-list-item'):
+            left = item.find('div', class_='information-list-item-left')
+            right = item.find('div', class_='information-list-item-right')
+            
+            if left and right:
+                key = left.get_text(strip=True).replace(' ', '')
+                value = right.get_text(strip=True)
+                info_items[key] = value
+        
+        return info_items
+    except Exception as e:
+        log_message(f"解析页面时出错: {str(e)}", "ERROR")
         return None
-    
-    info_items = {}
-    for item in info_div.find_all('div', class_='information-list-item'):
-        left = item.find('div', class_='information-list-item-left')
-        right = item.find('div', class_='information-list-item-right')
-        if left and right:
-            key = left.get_text(strip=True)
-            value = right.get_text(strip=True)
-            info_items[key] = value
-    
-    return info_items
 
-
-def check_single_vps(account_data, today):
-    """检查单个VPS账号的状态"""
-    account_email = account_data['remark']
-    cookies = {'DJkdikKMG': account_data['DJkdikKMG']}
+def check_single_vps(account_data: Dict, today: datetime.date) -> VPSResult:
+    """检查单个VPS账号状态"""
+    account = account_data['remark']
+    cookie_value = account_data['DJkdikKMG']
+    check_time = datetime.now().strftime("%H:%M:%S")
     
     headers = {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
         'Accept-Language': 'zh-CN,zh;q=0.9,en;q=0.8',
+        'Accept-Encoding': 'gzip, deflate, br',
+        'Connection': 'keep-alive',
+        'Upgrade-Insecure-Requests': '1',
         'Cache-Control': 'no-cache',
         'Pragma': 'no-cache'
     }
     
+    cookies = {'DJkdikKMG': cookie_value}
+    
     for attempt in range(RETRY_COUNT + 1):
         try:
-            # 随机延迟，避免请求过于频繁
+            # 请求延迟
             if attempt > 0:
-                delay = 2 ** attempt + random.uniform(0, 1)
+                delay = DELAY_BETWEEN_REQUESTS * (attempt + 1) + random.uniform(0, 1)
+                log_message(f"{account}: 第{attempt+1}次重试，等待{delay:.1f}秒", "DEBUG")
                 time.sleep(delay)
             
+            # 发送请求
             response = requests.get(
                 VPS_URL,
                 cookies=cookies,
@@ -211,258 +325,218 @@ def check_single_vps(account_data, today):
                 timeout=TIMEOUT
             )
             
-            # 处理重定向或访问限制
-            if response.status_code in (302, 403):
-                return {
-                    'account': account_email,
-                    'success': False,
-                    'error': f"访问受限({response.status_code})，可能Cookie失效"
-                }
+            # 检查响应状态
+            if response.status_code in [302, 403]:
+                error_msg = f"访问被拒绝(HTTP {response.status_code})，Cookie可能已失效"
+                if attempt == RETRY_COUNT:
+                    return VPSResult(
+                        account=account,
+                        success=False,
+                        error=error_msg,
+                        check_time=check_time
+                    )
+                continue
             
-            if response.status_code == 200:
-                soup = BeautifulSoup(response.text, 'html.parser')
-                info_items = parse_vps_info(soup)
-                
-                if not info_items:
-                    return {
-                        'account': account_email,
-                        'success': False,
-                        'error': "未找到VPS信息"
-                    }
-                
-                # 提取关键信息
-                transactions = int(info_items.get('近1月实盘交易数量', '0'))
-                location = info_items.get('服务器地址', 'N/A')
-                expire_date_str = info_items.get('到期日期', '')
-                vps_ip = info_items.get('VPS IP', 'N/A')
-                
-                # 计算剩余天数
-                days_left = None
-                if expire_date_str:
-                    try:
-                        expire_date = datetime.strptime(expire_date_str, "%Y-%m-%d").date()
-                        days_left = (expire_date - today).days
-                    except ValueError:
-                        expire_date_str = '格式错误'
-                
-                return {
-                    'account': account_email,
-                    'success': True,
-                    'ip': vps_ip,
-                    'location': location,
-                    'transactions': transactions,
-                    'expire_date': expire_date_str,
-                    'days_left': days_left
-                }
-            else:
-                return {
-                    'account': account_email,
-                    'success': False,
-                    'error': f"HTTP错误({response.status_code})"
-                }
-                
+            if response.status_code != 200:
+                error_msg = f"HTTP错误 {response.status_code}"
+                if attempt == RETRY_COUNT:
+                    return VPSResult(
+                        account=account,
+                        success=False,
+                        error=error_msg,
+                        check_time=check_time
+                    )
+                continue
+            
+            # 解析页面
+            info_items = parse_vps_page(response.text)
+            if not info_items:
+                error_msg = "未找到VPS信息"
+                if attempt == RETRY_COUNT:
+                    return VPSResult(
+                        account=account,
+                        success=False,
+                        error=error_msg,
+                        check_time=check_time
+                    )
+                continue
+            
+            # 提取信息
+            ip = info_items.get('VPSIP', 'N/A')
+            location = info_items.get('服务器地址', 'N/A')
+            
+            # 清理交易量数据
+            transactions_str = info_items.get('近1月实盘交易数量', '0')
+            transactions = int(re.sub(r'[^\d]', '', transactions_str) or '0')
+            
+            expire_date = info_items.get('到期日期', '')
+            days_left = None
+            
+            if expire_date:
+                try:
+                    expire_date_obj = datetime.strptime(expire_date, "%Y-%m-%d").date()
+                    days_left = (expire_date_obj - today).days
+                except ValueError:
+                    expire_date = "日期格式错误"
+            
+            return VPSResult(
+                account=account,
+                success=True,
+                ip=ip,
+                location=location,
+                transactions=transactions,
+                expire_date=expire_date,
+                days_left=days_left,
+                check_time=check_time
+            )
+            
         except requests.exceptions.Timeout:
-            error_msg = f"请求超时(尝试{attempt+1}/{RETRY_COUNT+1})"
+            error_msg = f"请求超时(第{attempt+1}次尝试)"
             if attempt == RETRY_COUNT:
-                return {
-                    'account': account_email,
-                    'success': False,
-                    'error': error_msg
-                }
+                return VPSResult(
+                    account=account,
+                    success=False,
+                    error=error_msg,
+                    check_time=check_time
+                )
         except requests.exceptions.RequestException as e:
             error_msg = f"网络错误: {str(e)}"
             if attempt == RETRY_COUNT:
-                return {
-                    'account': account_email,
-                    'success': False,
-                    'error': error_msg
-                }
+                return VPSResult(
+                    account=account,
+                    success=False,
+                    error=error_msg,
+                    check_time=check_time
+                )
         except Exception as e:
-            error_msg = f"解析错误: {str(e)}"
+            error_msg = f"未知错误: {str(e)}"
             if attempt == RETRY_COUNT:
-                return {
-                    'account': account_email,
-                    'success': False,
-                    'error': error_msg
-                }
+                return VPSResult(
+                    account=account,
+                    success=False,
+                    error=error_msg,
+                    check_time=check_time
+                )
     
-    return {
-        'account': account_email,
-        'success': False,
-        'error': "检查失败"
-    }
+    return VPSResult(
+        account=account,
+        success=False,
+        error="所有重试都失败",
+        check_time=check_time
+    )
 
-
-def check_all_vps():
-    """检查所有VPS状态"""
+def check_all_vps() -> List[VPSResult]:
+    """并发检查所有VPS账号"""
     today = datetime.now().date()
     results = []
     
     log_message(f"开始检查 {len(COOKIES_CONFIG)} 个VPS账号...", "INFO")
     
     with ThreadPoolExecutor(max_workers=MAX_THREADS) as executor:
-        # 提交所有任务
-        future_to_account = {
-            executor.submit(check_single_vps, account_data, today): 
-            account_data['remark'] for account_data in COOKIES_CONFIG
-        }
+        # 提交任务
+        future_to_account = {}
+        for account_data in COOKIES_CONFIG:
+            future = executor.submit(check_single_vps, account_data, today)
+            future_to_account[future] = account_data['remark']
         
-        # 收集结果
+        # 处理结果
         for future in as_completed(future_to_account):
-            account_name = future_to_account[future]
+            account = future_to_account[future]
             try:
-                result = future.result()
+                result = future.result(timeout=TIMEOUT + 5)
                 results.append(result)
-                if result['success']:
-                    days_left = result.get('days_left', '?')
-                    transactions = result.get('transactions', 0)
-                    log_message(f"{account_name}: IP={result.get('ip', 'N/A')}, 交易={transactions}, 剩余{days_left}天", "SUCCESS")
+                
+                if result.success:
+                    log_message(f"{account}: 检查成功 - IP: {result.ip}, 交易量: {result.transactions:,}, 剩余天数: {result.days_left or 'N/A'}", "SUCCESS")
                 else:
-                    log_message(f"{account_name}: {result.get('error', '未知错误')}", "ERROR")
+                    log_message(f"{account}: 检查失败 - {result.error}", "ERROR")
+                    
             except Exception as e:
-                log_message(f"{account_name}: 处理异常 - {str(e)}", "ERROR")
-                results.append({
-                    'account': account_name,
-                    'success': False,
-                    'error': f"处理异常: {str(e)}"
-                })
+                error_result = VPSResult(
+                    account=account,
+                    success=False,
+                    error=f"处理异常: {str(e)}",
+                    check_time=datetime.now().strftime("%H:%M:%S")
+                )
+                results.append(error_result)
+                log_message(f"{account}: 处理异常 - {str(e)}", "ERROR")
     
-    # 按原始顺序排序结果
+    # 按原始顺序排序
     account_order = {data['remark']: i for i, data in enumerate(COOKIES_CONFIG)}
-    results.sort(key=lambda x: account_order.get(x['account'], 999))
+    results.sort(key=lambda x: account_order.get(x.account, 999))
     
     return results
 
-
-def print_summary_table(vps_results):
-    """打印漂亮的汇总表格"""
-    from prettytable import PrettyTable
-    
-    table = PrettyTable()
-    table.field_names = ["账号", "状态", "IP地址", "交易量", "剩余天数", "备注"]
-    table.align["账号"] = "l"
-    table.align["备注"] = "l"
-    
-    for result in vps_results:
-        if result['success']:
-            status = "✅ 正常"
-            ip = result.get('ip', 'N/A')
-            transactions = str(result.get('transactions', 0))
-            days_left = str(result.get('days_left', '?'))
-            
-            # 添加到期警告
-            remark = ""
-            days = result.get('days_left')
-            if days is not None:
-                if days <= 3:
-                    remark = "⚠️ 即将到期"
-                elif days <= 7:
-                    remark = "⚠️ 7天内到期"
-                elif days <= 30:
-                    remark = "⏳ 30天内到期"
-        else:
-            status = "❌ 异常"
-            ip = "-"
-            transactions = "-"
-            days_left = "-"
-            remark = result.get('error', '检查失败')
-        
-        table.add_row([
-            result['account'],
-            status,
-            ip,
-            transactions,
-            days_left,
-            remark
-        ])
-    
-    print("\n" + "="*80)
-    print("VPS状态检查汇总")
-    print("="*80)
-    print(table)
-    
-    # 统计信息
-    total = len(vps_results)
-    normal = sum(1 for vps in vps_results if vps.get('success', False))
-    error = total - normal
-    
-    print(f"\n📊 统计: 共 {total} 个账号 | ✅ 正常: {normal} 个 | ❌ 异常: {error} 个")
-    
-    if error > 0:
-        print(f"⚠️  发现 {error} 个异常账号，请检查Cookie是否失效")
-    
-    return error
-
-
-def main():
+# ==================== 主函数 ====================
+def main() -> int:
     """主函数"""
-    log_message("VPS监控脚本开始运行", "INFO")
     start_time = time.time()
+    log_message("VPS监控脚本开始运行", "INFO")
     
     try:
-        # 检查所有VPS
-        vps_results = check_all_vps()
+        # 检查环境
+        if "GITHUB_ACTIONS" in os.environ:
+            log_message("运行环境: GitHub Actions", "INFO")
+            log_message(f"工作流: {os.getenv('GITHUB_WORKFLOW', '未知')}", "INFO")
+            log_message(f"触发事件: {os.getenv('GITHUB_EVENT_NAME', '未知')}", "INFO")
         
-        # 打印汇总表格
-        error_count = print_summary_table(vps_results)
+        # 执行检查
+        results = check_all_vps()
+        
+        # 打印汇总
+        print_simple_table(results)
         
         # 生成报告
-        report_content = format_vps_info(vps_results)
+        report = format_vps_report(results)
         
-        # 发送到企业微信
+        # 发送通知
         if WEBHOOK_URL:
-            log_message("准备发送通知到企业微信...", "INFO")
-            send_success = send_wechat_message(WEBHOOK_URL, report_content, is_markdown=True)
+            log_message("正在发送企业微信通知...", "INFO")
+            send_success = send_wechat_message(report)
             
-            if send_success:
-                log_message("通知发送成功", "SUCCESS")
-            else:
-                log_message("通知发送失败，但检查已完成", "WARNING")
+            if not send_success:
+                log_message("企业微信通知发送失败，但检查已完成", "WARNING")
         else:
-            log_message("未配置Webhook URL，跳过发送通知", "WARNING")
-            # 在本地运行时就打印报告内容
-            print("\n" + "="*80)
-            print("企业微信报告内容预览:")
-            print("="*80)
-            print(report_content)
+            log_message("未配置企业微信Webhook，跳过通知发送", "WARNING")
+            
+            # 在本地运行或GitHub Actions中打印报告
+            print("\n" + "="*90)
+            print("Markdown报告预览:".center(90))
+            print("="*90)
+            print(report)
         
-        # 输出执行时间
+        # 统计信息
         elapsed_time = time.time() - start_time
-        log_message(f"脚本执行完成，耗时 {elapsed_time:.2f} 秒", "SUCCESS")
+        success_count = sum(1 for r in results if r.success)
+        total_count = len(results)
         
-        # 只在完全失败时返回非零退出码
-        # 对于GitHub Actions，即使有部分错误也返回0，避免任务被标记为失败
-        success_count = sum(1 for result in vps_results if result.get('success', False))
+        log_message(f"检查完成！耗时: {format_duration(elapsed_time)}", "INFO")
+        log_message(f"检查结果: {success_count}/{total_count} 个账号成功", 
+                   "SUCCESS" if success_count > 0 else "ERROR")
         
+        # 返回退出码
         if success_count == 0:
-            log_message("所有账号检查都失败，脚本执行失败", "ERROR")
-            return 1  # 所有都失败才返回1
+            log_message("所有账号检查都失败，请检查配置", "ERROR")
+            return 1
         else:
-            log_message(f"脚本执行成功（{success_count}/{len(vps_results)} 成功）", "SUCCESS")
-            return 0  # 只要有一个成功就返回0
-        
+            return 0
+            
     except KeyboardInterrupt:
-        log_message("用户中断执行", "WARNING")
+        log_message("用户中断脚本执行", "WARNING")
         return 130
     except Exception as e:
         log_message(f"脚本执行出错: {str(e)}", "ERROR")
         return 1
 
-
+# ==================== 入口点 ====================
 if __name__ == "__main__":
-    # 设置编码
-    import sys
-    import io
-    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
-    sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8')
+    # 设置编码和缓冲
+    if sys.platform != "win32":
+        import locale
+        locale.setlocale(locale.LC_ALL, 'en_US.UTF-8')
     
-    # 尝试导入prettytable，如果没有安装则跳过
-    try:
-        from prettytable import PrettyTable
-        HAS_PRETTYTABLE = True
-    except ImportError:
-        HAS_PRETTYTABLE = False
-        log_message("未安装prettytable，将使用简单格式输出", "WARNING")
+    sys.stdout.reconfigure(encoding='utf-8') if hasattr(sys.stdout, 'reconfigure') else None
+    sys.stderr.reconfigure(encoding='utf-8') if hasattr(sys.stderr, 'reconfigure') else None
     
     # 运行主函数
     exit_code = main()
