@@ -37,16 +37,16 @@ DELAY_BETWEEN_REQUESTS = 1
 # ⚠️ 建议实际使用 GitHub Secrets
 COOKIES_CONFIG = [
     {
-        "DJkdikKMG": os.getenv("VPS_COOKIE_1"),
-        "remark": "vgfvxixz@idrrate.com"
+        'DJkdikKMG': '6OqTtw%2bzch7fL2BJvNgHLQ%3d%3d%7cFX3565537695%7chttps%3a%2f%2fimg.zy223.com%2fWikiEnterprise%2fsign%2fpersonph.png_wiki-template-global%7c5922814844%7c7cebf35dbf59a8100b6b52a74293a4e5',
+        'remark': 'vgfvxixz@idrrate.com'
     },
     {
-        "DJkdikKMG": os.getenv("VPS_COOKIE_2"),
-        "remark": "156627504@qq.com"
+        'DJkdikKMG': '3XZ26INfMzKMKGrK8hCLVQ%3d%3d%7csolar%40%e5%a5%89%e8%b4%a4%e7%94%9f%e6%b4%bb%7chttps%3a%2f%2fimg.zy223.com%2fthirdparty%2f2516564746%2f2516564746_62872.png_wiki200%7c0817793341%7cb86fd9f3c6b9bffd94e319ee18d59719',
+        'remark': '156627504@qq.com'
     },
     {
-        "DJkdikKMG": os.getenv("VPS_COOKIE_3"),
-        "remark": "pyjangubwq@iubridge.com"
+        'DJkdikKMG': 'nZ%2fREPYCNY4jChEq2TyhJQ%3d%3d%7cttt2655%7chttps%3a%2f%2fimg.zy223.com%2fWikiEnterprise%2fsign%2fpersonph.png_wiki-template-global%7c4800439765%7cea02e589b80d630acdef38cad02375b0',
+        'remark': 'pyjangubwq@iubridge.com'
     }
 ]
 
