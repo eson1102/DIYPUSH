@@ -1,0 +1,31 @@
+name: JWVPS Service Monitor
+
+on:
+  schedule:
+    # 每天北京时间 20:00 执行 (UTC 12:00)
+    - cron: '0 12 * * *'
+  workflow_dispatch: # 允许手动触发测试
+
+jobs:
+  run-monitor:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout Code
+      uses: actions/checkout@v3
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.9'
+
+    - name: Install Dependencies
+      run: |
+        pip install requests beautifulsoup4
+
+    - name: Run Script
+      env:
+        # 对应仓库中的 Secrets 变量名
+        WECHAT_WEBHOOK_URL111: ${{ secrets.WECHAT_WEBHOOK_URL111 }}
+        USER_COOKIES: ${{ secrets.USER_COOKIES }}
+      run: python jwy.py
