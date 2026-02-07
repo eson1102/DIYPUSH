@@ -87,7 +87,7 @@ def fetch_and_notify():
             print(f"        > 发现机器: {display_name:<10} | 到期: {expiry_str} | 剩余: {days_left}天")
             
             # 核心判断
-            if days_left <= 27:
+            if days_left <= 37:
                 icon = "🚫" if days_left < 0 else "⚠️"
                 status_text = f"已过期 {abs(days_left)} 天" if days_left < 0 else f"仅剩 {days_left} 天"
                 item_info = f"{icon} 机器: {display_name}\n📅 到期: {expiry_str}\n🔔 状态: {status_text}"
@@ -98,8 +98,9 @@ def fetch_and_notify():
         if warning_items:
             print(f"      - 发现 {len(warning_items)} 个到期目标，准备发送通知。")
             header = "🔔 【到期预警】 聚稳云服务监控\n" + "—" * 15 + "\n"
+            renew_link = "\n\n🔗 续费网址: https://www.jwvps.cn"
             footer = "\n" + "—" * 15 + f"\n检测时间: {datetime.now().strftime('%m-%d %H:%M')}"
-            full_msg = header + "\n\n".join(warning_items) + footer
+            full_msg = header + "\n\n".join(warning_items) + renew_link + footer
             send_wechat_text(full_msg)
         else:
             print(f"      - 结果: 所有服务正常 (均大于 7 天)，无需发送通知。")
