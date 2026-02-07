@@ -1,0 +1,14 @@
+[
+  {
+    "name": "搬瓦工-1",
+    "price": "49.9 USD",
+    "due_date": "2026-02-10",
+    "reminder_days": 3
+  },
+  {
+    "name": "腾讯云-轻量",
+    "price": "99 CNY",
+    "due_date": "2026-05-20",
+    "reminder_days": 7
+  }
+]
