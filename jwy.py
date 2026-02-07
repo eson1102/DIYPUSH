@@ -87,7 +87,7 @@ def fetch_and_notify():
             print(f"        > 发现机器: {display_name:<10} | 到期: {expiry_str} | 剩余: {days_left}天")
             
             # 核心判断
-            if days_left <= 37:
+            if days_left <= 7:
                 icon = "🚫" if days_left < 0 else "⚠️"
                 status_text = f"已过期 {abs(days_left)} 天" if days_left < 0 else f"仅剩 {days_left} 天"
                 item_info = f"{icon} 机器: {display_name}\n📅 到期: {expiry_str}\n🔔 状态: {status_text}"
