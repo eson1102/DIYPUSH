@@ -20,7 +20,7 @@ WECOM_WEBHOOK = os.environ.get('WECOM_WEBHOOK', '')
 # 地域列表
 REGIONS = ["ap-shanghai", "ap-guangzhou", "ap-beijing", "ap-hongkong", "ap-singapore"]
 # 预警阈值
-THRESHOLD_DAYS = 150
+THRESHOLD_DAYS = 15
 # 并发线程数
 MAX_WORKERS = 10 
 # ==========================================
