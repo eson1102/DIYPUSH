@@ -20,7 +20,16 @@ jobs:
 
       - name: Install Dependencies
         run: |
-          pip install requests tencentcloud-sdk-python-common tencentcloud-sdk-python-lighthouse
+                # 1. 升级 pip 到最新版，并增加网络容错
+                python -m pip install --upgrade pip
+                
+                # 2. 设置 pip 全局超时时间为 300 秒，防止网络卡顿导致死锁
+                pip config set global.timeout 300
+                
+                # 3. 尝试分步安装，避免一次性并发下载多个大包
+                pip install requests
+                pip install tencentcloud-sdk-python-common
+                pip install tencentcloud-sdk-python-lighthouse
 
       - name: Run Check Script
         env:
