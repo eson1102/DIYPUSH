@@ -1,0 +1,29 @@
+name: Tencent Cloud Lighthouse Check
+
+on:
+  schedule:
+    # 每天上午 10:00 (UTC 时间是 02:00) 运行一次
+    - cron: '0 2 * * *'
+  workflow_dispatch: # 允许手动点击按钮运行
+
+jobs:
+  check_instances:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Install Dependencies
+        run: |
+          pip install requests tencentcloud-sdk-python-common tencentcloud-sdk-python-lighthouse
+
+      - name: Run Check Script
+        env:
+          ACCOUNT_CONFIG: ${{ secrets.ACCOUNT_CONFIG }}
+          WECOM_WEBHOOK: ${{ secrets.WECOM_WEBHOOK }}
+        run: python check_tencent_cloud.py
