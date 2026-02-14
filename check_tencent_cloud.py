@@ -18,9 +18,20 @@ REGIONS = ["ap-shanghai", "ap-guangzhou", "ap-beijing", "ap-hongkong", "ap-singa
 THRESHOLD_DAYS = 150
 
 def send_wecom_notification(content):
-    if not WECOM_WEBHOOK: return
+    if not WECOM_WEBHOOK:
+        logging.error("❌ 错误：环境变量 WECOM_WEBHOOK 为空，请检查 Github Secrets 配置！")
+        return
+        
     payload = {"msgtype": "text", "text": {"content": content}}
-    requests.post(WECOM_WEBHOOK, json=payload, timeout=10)
+    try:
+        res = requests.post(WECOM_WEBHOOK, json=payload, timeout=15)
+        # 这一行非常重要，可以告诉你企业微信服务器为什么拒绝你
+        logging.info(f"🚀 企业微信返回结果: {res.text}") 
+        
+        if res.json().get("errcode") != 0:
+            logging.error(f"❌ 企业微信报错：{res.json().get('errmsg')}")
+    except Exception as e:
+        logging.error(f"❌ 网络请求异常: {e}")
 
 def fetch_region_instances(acc, region):
     results = []
