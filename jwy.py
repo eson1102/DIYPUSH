@@ -10,6 +10,9 @@ WEBHOOK_URL = os.getenv('WECHAT_WEBHOOK_URL111', '')
 TARGET_URL = "https://www.jwvps.cn/service?groupid=305"
 
 COOKIES = {
+    'PHPSESSID': 'p23qndprr34crcp8i9d0lc9gij',
+    'server_name_session': 'c061dc65ecf6346140196a1717c4ddb1',
+    'YOFDCRU': '8d9c0e69c77d99cf5ebe2d96f667ade4',
     'ZJMF_E111752CA3D1B055': 'eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJ1c2VyaW5mbyI6eyJpZCI6MjI4NCwidXNlcm5hbWUiOiJcdTVmMjBcdTVmZDdcdTViNjYifSwiaXNzIjoid3d3LmlkY1NtYXJ0LmNvbSIsImF1ZCI6Ind3dy5pZGNTbWFydC5jb20iLCJpcCI6IjM1LjcyLjguMjQ3IiwiaWF0IjoxNzcyMzcyMTAyLCJuYmYiOjE3NzIzNzIxMDIsImV4cCI6MTc3MjM3OTMwMn0.BomQY1tAdZlyRcwlLyvK1KTBFIm0BUUpl9Iy6Sh6OzU',
 }
 
