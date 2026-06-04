@@ -22,10 +22,6 @@ WEBHOOK_URL = os.getenv('WECHAT_WEBHOOK_URL111', '')
 # VPS账号配置
 COOKIES_CONFIG = [
     {
-        'DJkdikKMG': '6OqTtw%2bzch7fL2BJvNgHLQ%3d%3d%7cFX3565537695%7chttps%3a%2f%2fimg.zy223.com%2fWikiEnterprise%2fsign%2fpersonph.png_wiki-template-global%7c5922813873%7cc8020fbb721af53c164569793d0c012f',
-        'remark': 'vgfvxixz@idrrate.com'
-    },
-    {
         'DJkdikKMG': '3XZ26INfMzKMKGrK8hCLVQ%3d%3d%7csolar%40%e5%a5%89%e8%b4%a4%e7%94%9f%e6%b4%bb%7chttps%3a%2f%2fimg.zy223.com%2fthirdparty%2f2516564746%2f2516564746_62872.png_wiki200%7c0817793341%7cb86fd9f3c6b9bffd94e319ee18d59719',
         'remark': '156627504@qq.com'
     },
