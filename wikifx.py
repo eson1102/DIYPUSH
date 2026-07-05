@@ -39,6 +39,9 @@ MAX_THREADS = 3
 TIMEOUT = 15
 RETRY_COUNT = 2
 
+# 通知阈值：仅当剩余天数小于此值时发送通知
+NOTIFY_THRESHOLD_DAYS = 14
+
 # ==================== 日志函数 ====================
 def log_message(message: str, level: str = "INFO"):
     """统一的日志函数"""
@@ -323,8 +326,11 @@ def check_all_vps() -> list:
     return results
 
 # ==================== 格式化报告 ====================
-def format_report(results: list) -> str:
-    """格式化检查报告"""
+def format_report(results: list, filter_warning: bool = False) -> str:
+    """
+    格式化检查报告
+    filter_warning: 是否只输出预警信息（剩余天数 < NOTIFY_THRESHOLD_DAYS）
+    """
     current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     
     # 统计
@@ -333,62 +339,111 @@ def format_report(results: list) -> str:
     failed = total - success
     
     lines = []
-    lines.append(f"🚀 VPS状态检查报告 ({current_time})")
-    lines.append("")
-    lines.append(f"📊 状态: {success}正常 {failed}异常")
-    lines.append("")
     
-    # 异常账号
-    if failed > 0:
-        lines.append("❌ 异常账号:")
-        for result in results:
-            if not result["success"]:
-                error_msg = result.get("error", "未知错误")
-                # 简化错误信息
-                if "Cookie失效" in error_msg:
-                    error_msg = "Cookie失效"
-                elif "未找到VPS信息" in error_msg:
-                    error_msg = "无法获取VPS信息"
-                elif "HTTP 302" in error_msg:
-                    error_msg = "访问被拒绝"
-                lines.append(f"  • {result['account']}: {error_msg}")
-        lines.append("")
-    
-    # 正常账号
-    if success > 0:
-        lines.append("✅ 正常账号:")
+    if filter_warning:
+        # 只输出预警信息
+        warning_accounts = []
         for result in results:
             if result["success"]:
-                account_line = f"  • {result['account']}"
-                
-                # 添加到期警告
                 days_left = result.get("days_left")
-                if days_left is not None:
-                    if days_left < 0:
-                        account_line += f" 🔴 过期{-days_left}天"
-                    elif days_left <= 3:
-                        account_line += f" 🟠 {days_left}天到期"
-                    elif days_left <= 7:
-                        account_line += f" 🟡 {days_left}天到期"
-                
-                lines.append(account_line)
-                lines.append(f"    IP: {result.get('ip', 'N/A')}")
-                lines.append(f"    地区: {result.get('location', 'N/A')}")
-                lines.append(f"    交易: {result.get('transactions', 0)}笔")
-                
-                expire_date = result.get("expire_date")
-                if expire_date and expire_date != "N/A":
-                    lines.append(f"    到期: {expire_date}")
-                
-                lines.append("")
-    
-    # 运行信息
-    lines.append("📅 检查完成")
-    
-    if "GITHUB_ACTIONS" in os.environ:
-        run_number = os.getenv("GITHUB_RUN_NUMBER", "")
-        if run_number:
-            lines.append(f"🔗 GitHub Actions Run #{run_number}")
+                if days_left is not None and days_left < NOTIFY_THRESHOLD_DAYS:
+                    warning_accounts.append(result)
+        
+        if not warning_accounts:
+            # 没有预警，返回空字符串
+            return ""
+        
+        lines.append(f"⚠️ VPS到期预警通知 ({current_time})")
+        lines.append("")
+        lines.append(f"以下 {len(warning_accounts)} 个VPS将在 {NOTIFY_THRESHOLD_DAYS} 天内到期：")
+        lines.append("")
+        
+        for result in warning_accounts:
+            days_left = result.get("days_left")
+            expire_date = result.get("expire_date", "N/A")
+            
+            if days_left is not None:
+                if days_left < 0:
+                    days_text = f"🔴 已过期{-days_left}天"
+                elif days_left <= 3:
+                    days_text = f"🔴 {days_left}天到期"
+                elif days_left <= 7:
+                    days_text = f"🟠 {days_left}天到期"
+                else:
+                    days_text = f"🟡 {days_left}天到期"
+            else:
+                days_text = "未知"
+            
+            lines.append(f"📌 {result['account']}")
+            lines.append(f"   IP: {result.get('ip', 'N/A')}")
+            lines.append(f"   地区: {result.get('location', 'N/A')}")
+            lines.append(f"   到期: {expire_date}")
+            lines.append(f"   剩余: {days_text}")
+            lines.append(f"   交易: {result.get('transactions', 0)}笔")
+            lines.append("")
+        
+        lines.append("💡 请及时续费，避免VPS过期影响使用")
+        
+    else:
+        # 完整报告（用于控制台输出）
+        lines.append(f"🚀 VPS状态检查报告 ({current_time})")
+        lines.append("")
+        lines.append(f"📊 状态: {success}正常 {failed}异常")
+        lines.append("")
+        
+        # 异常账号
+        if failed > 0:
+            lines.append("❌ 异常账号:")
+            for result in results:
+                if not result["success"]:
+                    error_msg = result.get("error", "未知错误")
+                    # 简化错误信息
+                    if "Cookie失效" in error_msg:
+                        error_msg = "Cookie失效"
+                    elif "未找到VPS信息" in error_msg:
+                        error_msg = "无法获取VPS信息"
+                    elif "HTTP 302" in error_msg:
+                        error_msg = "访问被拒绝"
+                    lines.append(f"  • {result['account']}: {error_msg}")
+            lines.append("")
+        
+        # 正常账号
+        if success > 0:
+            lines.append("✅ 正常账号:")
+            for result in results:
+                if result["success"]:
+                    account_line = f"  • {result['account']}"
+                    
+                    # 添加到期警告
+                    days_left = result.get("days_left")
+                    if days_left is not None:
+                        if days_left < 0:
+                            account_line += f" 🔴 过期{-days_left}天"
+                        elif days_left <= 3:
+                            account_line += f" 🔴 {days_left}天到期"
+                        elif days_left <= 7:
+                            account_line += f" 🟠 {days_left}天到期"
+                        elif days_left < NOTIFY_THRESHOLD_DAYS:
+                            account_line += f" 🟡 {days_left}天到期"
+                    
+                    lines.append(account_line)
+                    lines.append(f"    IP: {result.get('ip', 'N/A')}")
+                    lines.append(f"    地区: {result.get('location', 'N/A')}")
+                    lines.append(f"    交易: {result.get('transactions', 0)}笔")
+                    
+                    expire_date = result.get("expire_date")
+                    if expire_date and expire_date != "N/A":
+                        lines.append(f"    到期: {expire_date}")
+                    
+                    lines.append("")
+        
+        # 运行信息
+        lines.append("📅 检查完成")
+        
+        if "GITHUB_ACTIONS" in os.environ:
+            run_number = os.getenv("GITHUB_RUN_NUMBER", "")
+            if run_number:
+                lines.append(f"🔗 GitHub Actions Run #{run_number}")
     
     return "\n".join(lines)
 
@@ -448,21 +503,31 @@ def main():
         # 打印表格
         print_table(results)
         
-        # 生成报告
-        report = format_report(results)
+        # 生成完整报告（用于控制台输出）
+        full_report = format_report(results, filter_warning=False)
         
-        # 发送通知
+        # 生成预警报告（仅包含即将到期的VPS）
+        warning_report = format_report(results, filter_warning=True)
+        
+        # 发送通知 - 仅当存在即将到期的VPS时才发送
         if WEBHOOK_URL:
-            log_message("发送企业微信通知...", "INFO")
-            if send_wechat_text_message(report):
-                log_message("通知发送成功", "SUCCESS")
+            if warning_report:
+                log_message(f"发现即将到期的VPS，发送企业微信通知...", "INFO")
+                if send_wechat_text_message(warning_report):
+                    log_message("通知发送成功", "SUCCESS")
+                else:
+                    log_message("通知发送失败", "WARNING")
             else:
-                log_message("通知发送失败", "WARNING")
+                log_message(f"所有VPS剩余天数均 >= {NOTIFY_THRESHOLD_DAYS}天，无需发送通知", "INFO")
+                print("\n" + "="*60)
+                print(f"✅ 所有VPS剩余天数均大于等于 {NOTIFY_THRESHOLD_DAYS}天，无预警")
+                print(f"📊 详细报告已输出到控制台")
+                print("="*60)
         else:
             log_message("未配置Webhook，跳过通知", "WARNING")
             print("\n企业微信报告内容:")
             print("="*60)
-            print(report)
+            print(full_report)
             print("="*60)
         
         # 执行时间
