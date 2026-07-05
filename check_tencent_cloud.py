@@ -19,8 +19,8 @@ WECOM_WEBHOOK = os.environ.get('WECOM_WEBHOOK', '')
 
 # 地域列表
 REGIONS = ["ap-shanghai", "ap-guangzhou", "ap-beijing", "ap-hongkong", "ap-singapore"]
-# 预警阈值
-THRESHOLD_DAYS = 15
+# 预警阈值（通知触发阈值）
+THRESHOLD_DAYS = 14  # 改为14天
 # 并发线程数
 MAX_WORKERS = 10 
 # ==========================================
@@ -114,9 +114,15 @@ def main():
     report += f"----------------------------\n"
     report += f"💡 请及时处理即将到期的实例。"
 
-    # 输出到控制台并发送通知
+    # 输出到控制台（始终打印）
     print(report)
-    send_wecom_notification(report)
+    
+    # **只在存在预警（剩余天数 <= 14天）时发送企业微信通知**
+    if warning_list:
+        send_wecom_notification(report)
+        logging.info(f"✅ 发现 {len(warning_list)} 台即将到期实例，已发送通知")
+    else:
+        logging.info("ℹ️ 所有实例剩余天数均大于14天，无需发送通知")
 
 if __name__ == "__main__":
     main()
