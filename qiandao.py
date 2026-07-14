@@ -1,7 +1,7 @@
 import requests
 import json
 
-token_str = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI2MjkiLCJlbWFpbCI6ImR1bmNhbnl1MTEwMkBnbWFpbC5jb20iLCJleHAiOjE3ODQxNjM1NTF9.MT9j2DehTtp2j3eIzJkS-1s1xUL1ea3kZ-wvdqWC-7o"
+token_str = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI2MjkiLCJlbWFpbCI6ImR1bmNhbnl1MTEwMkBnbWFpbC5jb20iLCJleHAiOjE3ODQ1OTczNzV9.t9dg_hZYV5uKb77POQ2s9AjnpA1hg2xj3CvX_UhWfPk"
 
 headers = {
     "Authorization": f"Bearer {token_str}",
