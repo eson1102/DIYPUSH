@@ -25,4 +25,5 @@ jobs:
           SECRET_KEY: ${{ secrets.TENCENT_SECRET_KEY }}
           REGION: 'ap-shanghai'
           BUCKET: 'chitu-1251006555'
+          WECOM_WEBHOOK: 'https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=e75ac7b2-f7e7-45a5-a7b8-0f92390ab020'
         run: python clashupdate.py
