@@ -25,4 +25,4 @@ jobs:
           SECRET_KEY: ${{ secrets.TENCENT_SECRET_KEY }}
           REGION: 'ap-shanghai'
           BUCKET: 'chitu-1251006555'
-        run: python clash.py
+        run: python clashupdate.py
