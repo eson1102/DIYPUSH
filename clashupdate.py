@@ -2,53 +2,41 @@ import requests
 from qcloud_cos import CosConfig, CosS3Client
 import os
 
-# 腾讯云信息
-secret_id = os.environ["SECRET_ID"]      # 替换为您的 SecretId
-secret_key = os.environ["SECRET_KEY"]    # 替换为您的 SecretKey
-region = os.environ["REGION"]            # 替换为桶的所在地域
-bucket = os.environ["BUCKET"]            # 替换为您的桶名称
-telegram_token = os.environ["BOT_TOKEN"]
-telegram_chat_id = os.environ["CHAT_ID"]
+url = "https://misub-d0t.pages.dev/profiles/dafd961f-bcb2-4c0b-9dbd-2fe3ca591923?clash"
 
-# 使用请求库获取 ini 文件的内容
-response = requests.get( "https://subapi.cmliussss.net/sub?&url=https%3A%2F%2Fliangxin.xyz%2Fapi%2Fv1%2Fliangxin%3FOwO%3D157455d98344480a62661bfeeb739607&target=clash&emoji=true&append_type=true&append_info=true&scv=false&udp=false&list=false&sort=false&fdn=false&insert=false",
-    timeout=200
-)
+headers = {
+    "User-Agent": "Clash/Windows"
+}
 
-# 原始二进制内容
-file_content = response.content
+secret_id = os.environ["SECRET_ID"]
+secret_key = os.environ["SECRET_KEY"]
+region = os.environ["REGION"]
+bucket = os.environ["BUCKET"]
 
-# 尝试以 utf-8 解码，解码失败则替换掉错误字符
 try:
+    response = requests.get(url, headers=headers, timeout=200)
+    response.raise_for_status()
+    file_content = response.content
+
     text = file_content.decode('utf-8', errors='replace')
-except Exception:
-    text = repr(file_content)
+    print("Fetched content (first 300 chars):")
+    print(text[:300])
 
-# 只输出前 300 字符
-print("Fetched content (first 300 chars):")
-print(text[:300])
+    config = CosConfig(Region=region, SecretId=secret_id, SecretKey=secret_key)
+    cos_client = CosS3Client(config)
 
-# 腾讯云 COS 的配置和客户端初始化
-config = CosConfig(Region=region, SecretId=secret_id, SecretKey=secret_key)
-cos_client = CosS3Client(config)
+    upload_response = cos_client.put_object(
+        Bucket=bucket,
+        Body=file_content,
+        Key='2',
+    )
 
-# 上传文件：'1' 是对象键（Key），根据需求可改
-upload_response = cos_client.put_object(
-    Bucket=bucket,
-    Body=file_content,
-    Key='1',
-)
+    upload_str = str(upload_response)
+    print("Upload response (first 300 chars):")
+    print(upload_str[:300])
 
-# 将上传响应转换为字符串并截断
-upload_str = str(upload_response)
-print("Upload response (first 300 chars):")
-print(upload_str[:300])
-
-print("clash 文件更新及日志输出完成！")
-
-# 如果仍要通过 Telegram 通知，可取消下面注释：
-# telegram_msg = f"Fetched: {text[:100]}...\nUploaded response: {upload_str[:100]}..."
-# requests.post(
-#     f'https://api.telegram.org/bot{telegram_token}/sendMessage',
-#     json={"chat_id": telegram_chat_id, "text": telegram_msg}
-# )
+    print("clash 文件更新及日志输出完成！")
+except requests.exceptions.RequestException as e:
+    print(f"请求失败: {e}")
+except Exception as e:
+    print(f"上传失败: {e}")
