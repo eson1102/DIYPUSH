@@ -28,7 +28,7 @@ try:
     upload_response = cos_client.put_object(
         Bucket=bucket,
         Body=file_content,
-        Key='1',
+        Key='2',
     )
 
     upload_str = str(upload_response)
