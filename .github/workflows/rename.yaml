@@ -1,4 +1,4 @@
-name: Process and Upload Clash YAML
+name: 处理并上传 Clash YAML
 
 on:
   workflow_dispatch:
@@ -8,54 +8,65 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v3
+      - name: 检出代码仓库
+        uses: actions/checkout@v4
 
-      - name: Download Clash YAML
-        run: |
-          curl -L -o clash.yaml "https://cfdingyue-4lu.pages.dev/a5ce27a6-76df-48da-be62-493fbda9a3af?clash"
-
-      - name: Download rename.js
-        run: |
-          curl -L -o rename.js "https://raw.githubusercontent.com/yaney01/Keywos/refs/heads/main/rename.js"
-          chmod +x rename.js
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v3
+      - name: 设置 Python 环境
+        uses: actions/setup-python@v5
         with:
-          node-version: '18'
+          python-version: '3.x'
 
-      - name: Run rename.js to process YAML
+      - name: 安装依赖包
         run: |
-          node rename.js clash.yaml processed.yaml
+          pip install requests cos-python-sdk-v5
 
-      - name: Upload processed.yaml to Tencent COS
+      - name: 获取 Clash 配置并上传到腾讯云 COS
         env:
-          TENCENT_SECRET_ID: ${{ secrets.TENCENT_SECRET_ID }}
-          TENCENT_SECRET_KEY: ${{ secrets.TENCENT_SECRET_KEY }}
-          COS_BUCKET: 'chitu-1251006555'       # 请替换成你的桶名
-          COS_REGION: 'ap-shanghai'              # 请替换成你的地域
-          COS_KEY: 'processed/processed.yaml'  # 上传到桶内的路径
+          SECRET_ID: ${{ secrets.TENCENT_SECRET_ID }}
+          SECRET_KEY: ${{ secrets.TENCENT_SECRET_KEY }}
+          REGION: 'ap-shanghai'
+          BUCKET: 'chitu-1251006555'
         run: |
-          npm install cos-nodejs-sdk-v5
-          node -e "
-            const COS = require('cos-nodejs-sdk-v5');
-            const fs = require('fs');
-            const cos = new COS({
-              SecretId: process.env.TENCENT_SECRET_ID,
-              SecretKey: process.env.TENCENT_SECRET_KEY
-            });
-            cos.putObject({
-              Bucket: process.env.COS_BUCKET,
-              Region: process.env.COS_REGION,
-              Key: process.env.COS_KEY,
-              Body: fs.createReadStream('processed.yaml')
-            }, function(err, data) {
-              if (err) {
-                console.error('Upload failed:', err);
-                process.exit(1);
-              } else {
-                console.log('Upload success:', data);
-              }
-            });
+          python -c "
+import requests
+from qcloud_cos import CosConfig, CosS3Client
+import os
+
+# Clash 配置文件 URL
+url = 'https://misub-d0t.pages.dev/profiles/dafd961f-bcb2-4c0b-9dbd-2fe3ca591923?clash'
+headers = {'User-Agent': 'Clash/Windows'}
+
+# 从环境变量读取腾讯云配置
+secret_id = os.environ['SECRET_ID']
+secret_key = os.environ['SECRET_KEY']
+region = os.environ['REGION']
+bucket = os.environ['BUCKET']
+
+# 获取 Clash 配置内容
+response = requests.get(url, headers=headers, timeout=200)
+response.raise_for_status()
+file_content = response.content
+
+# 打印获取到的内容前 300 字符
+text = file_content.decode('utf-8', errors='replace')
+print('获取到的内容（前 300 字符）:')
+print(text[:300])
+
+# 初始化腾讯云 COS 客户端
+config = CosConfig(Region=region, SecretId=secret_id, SecretKey=secret_key)
+cos_client = CosS3Client(config)
+
+# 上传到 COS
+upload_response = cos_client.put_object(
+    Bucket=bucket,
+    Body=file_content,
+    Key='1',
+)
+
+# 打印上传结果前 300 字符
+upload_str = str(upload_response)
+print('上传响应（前 300 字符）:')
+print(upload_str[:300])
+
+print('Clash 文件更新及日志输出完成！')
           "
