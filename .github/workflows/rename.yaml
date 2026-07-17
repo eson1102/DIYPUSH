@@ -1,10 +1,11 @@
 name: 处理并上传 Clash YAML
 
 on:
-    schedule:
-        # 每天上午 10:00 (UTC 时间是 02:00) 运行一次
-        - cron: '0 2 * * *'
-      workflow_dispatch: # 允许手动点击按钮运行
+  schedule:
+    # 每天上午 10:00 (UTC 时间是 02:00) 运行一次
+    - cron: '0 2 * * *'
+  workflow_dispatch: # 允许手动点击按钮运行
+
 
 jobs:
   process_upload:
