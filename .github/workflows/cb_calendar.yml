@@ -38,7 +38,7 @@ jobs:
       - name: 失败通知
         if: failure()
         env:
-          WEBHOOK_URL: ${{ secrets.WEBHOOK_URL }}
+          WEBHOOK_URL: ${{ secrets.WECOM_WEBHOOK }}
         run: |
           curl -X POST -H "Content-Type: application/json" \
             -d '{"msgtype":"text","text":{"content":"❌ 可转债申购提醒任务执行失败，请检查日志"}}' \
