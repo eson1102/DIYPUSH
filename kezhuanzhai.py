@@ -54,7 +54,7 @@ def get_apply_data():
             temp_df = bond_df.copy()
             temp_df[orig_col] = pd.to_datetime(temp_df[orig_col], errors='coerce')
             
-            # ========== 关键改动：筛选今天和明天 ==========
+            # 筛选今天和明天
             mask = (temp_df[orig_col].dt.date == today) | (temp_df[orig_col].dt.date == tomorrow)
             filtered = temp_df[mask].copy()
             
@@ -103,6 +103,7 @@ def get_apply_data():
 
 def format_text_message(df):
     """格式化纯文本消息"""
+    now = datetime.now().strftime('%Y-%m-%d %H:%M')
     today = datetime.now().strftime('%Y-%m-%d')
     tomorrow = (datetime.now() + timedelta(days=1)).strftime('%Y-%m-%d')
     
@@ -113,7 +114,8 @@ def format_text_message(df):
     today_count = len(df[df['日期'] == today])
     tomorrow_count = len(df[df['日期'] == tomorrow])
     
-    msg = f"【可转债申购提醒】{today}\n"
+    # ========== 标题加上具体时间 ==========
+    msg = f"【可转债申购提醒】{now}\n"
     msg += "-" * 40 + "\n"
     
     stat_parts = []
