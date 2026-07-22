@@ -1,49 +1,45 @@
-name: 可转债日历定时推送
+name: 可转债申购提醒
 
 on:
-  # 定时触发：每天北京时间 8:30 运行
-  # UTC 时间 0:30 = 北京时间 8:30
+  # ========== 定时触发：北京时间 9:00 和 14:00 ==========
+  # UTC 时间 1:00 = 北京时间 9:00
+  # UTC 时间 6:00 = 北京时间 14:00
   schedule:
-    - cron: '30 0 * * *'
+    - cron: '0 1 * * *'   # 每天 UTC 1:00 → 北京时间 9:00
+    - cron: '0 6 * * *'   # 每天 UTC 6:00 → 北京时间 14:00
   
   # 允许手动触发（方便测试）
   workflow_dispatch:
 
 jobs:
-  send-calendar:
+  send-reminder:
     runs-on: ubuntu-latest
     
     steps:
-      # 1. 检出代码
       - name: 检出代码
         uses: actions/checkout@v4
       
-      # 2. 设置 Python
       - name: 设置 Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.10'
           cache: 'pip'
       
-      # 3. 安装依赖
       - name: 安装依赖
         run: |
           pip install -r requirements.txt
       
-      # 4. 运行脚本
-      - name: 运行可转债日历脚本
+      - name: 运行可转债申购提醒
         env:
-          # 从 GitHub Secrets 读取 Webhook URL
-          WEBHOOK_URL: ${{ secrets.WECOM_WEBHOOK }}
+          WEBHOOK_URL: ${{ secrets.WEBHOOK_URL }}
         run: |
           python kezhuanzhai.py
       
-      # 5. (可选) 如果失败，发送失败通知
       - name: 失败通知
         if: failure()
         env:
           WEBHOOK_URL: ${{ secrets.WEBHOOK_URL }}
         run: |
           curl -X POST -H "Content-Type: application/json" \
-            -d '{"msgtype":"text","text":{"content":"❌ 可转债日历推送任务执行失败，请检查日志"}}' \
+            -d '{"msgtype":"text","text":{"content":"❌ 可转债申购提醒任务执行失败，请检查日志"}}' \
             $WEBHOOK_URL
