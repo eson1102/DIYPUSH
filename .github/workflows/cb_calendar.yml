@@ -34,7 +34,7 @@ jobs:
       - name: 运行可转债日历脚本
         env:
           # 从 GitHub Secrets 读取 Webhook URL
-          WEBHOOK_URL: ${{ secrets.WEBHOOK_URL }}
+          WEBHOOK_URL: ${{ secrets.WECOM_WEBHOOK }}
         run: |
           python kezhuanzhai.py
       
