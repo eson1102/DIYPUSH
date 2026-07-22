@@ -7,12 +7,11 @@ from datetime import datetime, timedelta
 
 # ==================== 配置区 ====================
 WEBHOOK_URL = os.environ.get('WEBHOOK_URL', '')
-FUTURE_DAYS = 7
 
 # ==================== 核心函数 ====================
 
-def get_calendar_data():
-    """获取可转债申购和上市数据"""
+def get_apply_data():
+    """获取今明两日可申购的可转债"""
     try:
         print("📊 从 bond_zh_cov 获取可转债数据...")
         bond_df = ak.bond_zh_cov()
@@ -43,26 +42,29 @@ def get_calendar_data():
         print(f"✅ 找到日期列：{actual_date_cols}")
         
         today = datetime.now().date()
-        future = today + timedelta(days=FUTURE_DAYS)
+        tomorrow = today + timedelta(days=1)
         
         result_dfs = []
         
         for orig_col, new_col in actual_date_cols.items():
+            # 只处理"申购"相关的列
+            if '申购' not in orig_col and 'apply' not in orig_col.lower():
+                continue
+                
             temp_df = bond_df.copy()
             temp_df[orig_col] = pd.to_datetime(temp_df[orig_col], errors='coerce')
             
-            mask = (temp_df[orig_col].dt.date >= today) & (temp_df[orig_col].dt.date <= future)
+            # ========== 关键改动：筛选今天和明天 ==========
+            mask = (temp_df[orig_col].dt.date == today) | (temp_df[orig_col].dt.date == tomorrow)
             filtered = temp_df[mask].copy()
             
             if not filtered.empty:
                 filtered.rename(columns={orig_col: '日期'}, inplace=True)
                 
-                if '申购' in orig_col:
-                    filtered['类型'] = '申购'
-                elif '上市' in orig_col or 'list' in orig_col.lower():
-                    filtered['类型'] = '上市'
-                else:
-                    filtered['类型'] = '其他'
+                # 标记是今天还是明天
+                filtered['日期标签'] = filtered['日期'].apply(
+                    lambda x: '🔥 今日申购' if x.date() == today else '📅 明日申购'
+                )
                 
                 # 保留关键列
                 keep_cols = []
@@ -71,14 +73,14 @@ def get_calendar_data():
                         keep_cols.append(col)
                     elif '名称' in col or '简称' in col or 'name' in col.lower():
                         keep_cols.append(col)
-                    elif col == '日期' or col == '类型':
+                    elif col == '日期' or col == '日期标签':
                         keep_cols.append(col)
                 
                 final_cols = list(dict.fromkeys(keep_cols))
                 if '日期' not in final_cols:
                     final_cols.append('日期')
-                if '类型' not in final_cols:
-                    final_cols.append('类型')
+                if '日期标签' not in final_cols:
+                    final_cols.append('日期标签')
                 
                 filtered = filtered[final_cols]
                 result_dfs.append(filtered)
@@ -86,10 +88,10 @@ def get_calendar_data():
         if result_dfs:
             result_df = pd.concat(result_dfs, ignore_index=True)
             result_df = result_df.sort_values('日期')
-            print(f"✅ 筛选出 {len(result_df)} 条未来 {FUTURE_DAYS} 天内的数据")
+            print(f"✅ 找到 {len(result_df)} 只今明两日可申购的可转债")
             return result_df
         else:
-            print("ℹ️ 未来 7 天内没有可转债动态")
+            print("ℹ️ 今明两日没有可申购的可转债")
             return pd.DataFrame()
     
     except Exception as e:
@@ -102,30 +104,30 @@ def get_calendar_data():
 def format_text_message(df):
     """格式化纯文本消息"""
     today = datetime.now().strftime('%Y-%m-%d')
+    tomorrow = (datetime.now() + timedelta(days=1)).strftime('%Y-%m-%d')
     
     if '日期' in df.columns:
         df['日期'] = pd.to_datetime(df['日期']).dt.strftime('%Y-%m-%d')
-        df = df.sort_values('日期')
     
-    type_counts = df['类型'].value_counts()
+    # 统计今天和明天的数量
+    today_count = len(df[df['日期'] == today])
+    tomorrow_count = len(df[df['日期'] == tomorrow])
     
-    msg = f"【可转债日历】{today}\n"
+    msg = f"【可转债申购提醒】{today}\n"
     msg += "-" * 40 + "\n"
-    msg += f"未来 {FUTURE_DAYS} 天内共有 {len(df)} 只可转债有动态\n"
     
     stat_parts = []
-    for t in ['申购', '上市']:
-        if t in type_counts:
-            stat_parts.append(f"{t} {type_counts[t]} 只")
-    if stat_parts:
-        msg += "（" + "，".join(stat_parts) + "）\n"
-    msg += "\n"
+    if today_count > 0:
+        stat_parts.append(f"今日 {today_count} 只")
+    if tomorrow_count > 0:
+        stat_parts.append(f"明日 {tomorrow_count} 只")
+    msg += "今明两日共有 " + "，".join(stat_parts) + " 可转债开放申购\n\n"
     
-    for event_type in ['申购', '上市', '其他']:
-        type_df = df[df['类型'] == event_type]
+    # 先显示今日，再显示明日
+    for date_label in ['🔥 今日申购', '📅 明日申购']:
+        type_df = df[df['日期标签'] == date_label]
         if not type_df.empty:
-            emoji = "🎯" if event_type == '申购' else "📈" if event_type == '上市' else "📋"
-            msg += f"{emoji} {event_type}：\n"
+            msg += f"{date_label}：\n"
             for _, row in type_df.iterrows():
                 code = 'N/A'
                 name = 'N/A'
@@ -140,21 +142,12 @@ def format_text_message(df):
                 msg += f"  {name}（{code}）{date}\n"
             msg += "\n"
     
-    today_str = datetime.now().strftime('%Y-%m-%d')
-    today_events = df[df['日期'] == today_str]
-    if not today_events.empty:
-        msg += "🔔 今日提醒：\n"
-        for _, row in today_events.iterrows():
-            name = 'N/A'
-            for col in row.index:
-                if '名称' in col or 'name' in col.lower() or '简称' in col:
-                    name = row[col]
-            event_type = row.get('类型', '')
-            msg += f"  ⚠️ {name} 今日 {event_type}！\n"
-        msg += "\n"
+    if len(df) == 0:
+        msg += "今明两日暂无申购\n\n"
     
     msg += "-" * 40 + "\n"
-    msg += "数据来源：东方财富 | 仅供参考，投资需谨慎"
+    msg += "💡 记得在交易时间内申购\n"
+    msg += "📊 数据来源：东方财富 | 仅供参考"
     
     return msg
 
@@ -192,15 +185,14 @@ def send_to_wechat(message):
 
 
 def main():
-    print(f"🚀 开始运行可转债日历推送任务...")
-    print(f"📅 查询范围：未来 {FUTURE_DAYS} 天")
+    print(f"🚀 开始运行可转债申购提醒任务...")
     print(f"⏰ 当前时间：{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     
-    df = get_calendar_data()
+    df = get_apply_data()
     
-    # ========== 没有数据就不推送 ==========
+    # 没有数据就不推送
     if df.empty:
-        print("ℹ️ 未来 7 天内没有可转债动态，跳过推送")
+        print("ℹ️ 今明两日没有可申购的可转债，跳过推送")
         print("✅ 任务结束（无数据，不发送消息）")
         return True
     
