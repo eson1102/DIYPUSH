@@ -1,0 +1,790 @@
+// ==UserScript==
+// @name         策略研究平台 - 今仓监控（排版优化版）
+// @namespace    http://m.hunansanhe.com:20008
+// @version      4.0
+// @description  监控今仓手数变化，优化消息排版，增加阅读性
+// @author       YourName
+// @match        http://m.hunansanhe.com:20008/data.html
+// @match        http://m.hunansanhe.com:20008/ht/*
+// @grant        GM_xmlhttpRequest
+// @grant        GM_setValue
+// @grant        GM_getValue
+// @grant        GM_deleteValue
+// @grant        GM_notification
+// @run-at       document-end
+// ==/UserScript==
+
+(function() {
+    'use strict';
+
+    // ============================================================
+    // 配置区
+    // ============================================================
+
+    const CONFIG = {
+        wechatWebhook: 'https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=86748ff7-e6d0-4c5f-b915-958ae95a885b',
+        monitor: {
+            roomName: '天道→套利室',
+            minInterval: 5,
+            maxInterval: 10,
+        },
+        storage: {
+            stateKey: 'monitor_state_v2',
+            historyKey: 'monitor_history_today',
+        }
+    };
+
+    // ============================================================
+    // 工具函数
+    // ============================================================
+
+    function getRandomInterval() {
+        const min = CONFIG.monitor.minInterval * 60 * 1000;
+        const max = CONFIG.monitor.maxInterval * 60 * 1000;
+        return Math.floor(Math.random() * (max - min + 1)) + min;
+    }
+
+    function formatTime(date) {
+        return date.toLocaleString('zh-CN', {
+            hour12: false,
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit',
+            hour: '2-digit',
+            minute: '2-digit',
+            second: '2-digit'
+        });
+    }
+
+    function formatNumber(num) {
+        if (num === undefined || num === null) return '--';
+        return num.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    }
+
+    function formatProfit(num) {
+        if (num === undefined || num === null) return '--';
+        if (num > 0) return `+${num.toLocaleString('zh-CN')}`;
+        return num.toLocaleString('zh-CN');
+    }
+
+    // ============================================================
+    // 日志工具
+    // ============================================================
+
+    const logger = {
+        info: (msg) => console.log(`[今仓监控] ℹ️ ${msg}`),
+        warn: (msg) => console.warn(`[今仓监控] ⚠️ ${msg}`),
+        error: (msg) => console.error(`[今仓监控] ❌ ${msg}`),
+        success: (msg) => console.log(`[今仓监控] ✅ ${msg}`),
+        debug: (msg) => console.log(`[今仓监控] 🔍 ${msg}`),
+    };
+
+    // ============================================================
+    // 持久化状态管理器
+    // ============================================================
+
+    const StateManager = {
+        saveState(orders, equityData) {
+            try {
+                const state = {
+                    timestamp: new Date().toISOString(),
+                    orders: orders,
+                    equityData: equityData,
+                    isInitialized: true
+                };
+                GM_setValue(CONFIG.storage.stateKey, JSON.stringify(state));
+                return true;
+            } catch (e) {
+                logger.error('保存状态失败:', e);
+                return false;
+            }
+        },
+
+        loadState() {
+            try {
+                const raw = GM_getValue(CONFIG.storage.stateKey);
+                if (!raw) return null;
+                return JSON.parse(raw);
+            } catch (e) {
+                logger.warn('加载状态失败:', e);
+                return null;
+            }
+        },
+
+        isInitialized() {
+            try {
+                const state = this.loadState();
+                return state !== null && state.isInitialized === true;
+            } catch (e) {
+                return false;
+            }
+        },
+
+        clearState() {
+            try {
+                GM_deleteValue(CONFIG.storage.stateKey);
+                logger.success('状态已清除');
+                return true;
+            } catch (e) {
+                logger.error('清除状态失败:', e);
+                return false;
+            }
+        },
+
+        addHistory(message) {
+            try {
+                const history = GM_getValue(CONFIG.storage.historyKey, '');
+                const line = `[${new Date().toISOString()}]\n${message}\n${'-'.repeat(40)}\n`;
+                let newHistory = line + history;
+                if (newHistory.length > 50000) {
+                    newHistory = newHistory.substring(0, 50000);
+                }
+                GM_setValue(CONFIG.storage.historyKey, newHistory);
+            } catch (e) {}
+        },
+
+        getHistory() {
+            try {
+                return GM_getValue(CONFIG.storage.historyKey, '');
+            } catch (e) {
+                return '';
+            }
+        }
+    };
+
+    // ============================================================
+    // 数据解析
+    // ============================================================
+
+    const DataParser = {
+        parseTodayPositions() {
+            const result = [];
+            const products = document.querySelector('#products');
+            if (!products) return result;
+
+            const rows = products.querySelectorAll('tr');
+            for (const row of rows) {
+                const cells = row.querySelectorAll('td');
+                if (cells.length < 12) continue;
+
+                try {
+                    const todayPos = parseInt(cells[10].textContent) || 0;
+                    const yesterdayPos = parseInt(cells[9].textContent) || 0;
+                    if (todayPos > 0 || yesterdayPos > 0) {
+                        result.push({
+                            name: cells[0].textContent.trim(),
+                            contract: cells[1].textContent.trim(),
+                            direction: cells[2].textContent.trim(),
+                            todayPos: todayPos,
+                            yesterdayPos: yesterdayPos,
+                            avgPrice: parseFloat(cells[6].textContent.replace(/,/g, '')) || 0,
+                            currentPrice: parseFloat(cells[11].textContent.replace(/,/g, '')) || 0,
+                            profit: parseFloat(cells[7].textContent.replace(/,/g, '')) || 0,
+                        });
+                    }
+                } catch (e) {}
+            }
+            return result;
+        },
+
+        // ============================================================
+        // 排版优化：品种名称后换行 + 缩进
+        // ============================================================
+
+        generateStartupSummary(orders, equityData) {
+            if (!orders || orders.length === 0) {
+                return '📋 当前无今仓持仓';
+            }
+
+            const hasToday = orders.filter(o => o.todayPos > 0);
+            if (hasToday.length === 0) {
+                return '📋 当前无今仓持仓';
+            }
+
+            const totalToday = hasToday.reduce((sum, o) => sum + o.todayPos, 0);
+            let text = `📌 当前今仓持仓\n   ${hasToday.length} 笔，共 ${totalToday} 手\n\n`;
+
+            hasToday.forEach((order) => {
+                const profitStr = order.profit >= 0 ? `+${order.profit.toLocaleString()}` : order.profit.toLocaleString();
+                // 品种名称换行，下一行缩进显示详情
+                text += `▪ ${order.name}\n`;
+                text += `   ${order.contract}  ${order.todayPos}手  均价 ${order.avgPrice.toFixed(2)}  盈亏 ${profitStr}\n`;
+                text += '\n';
+            });
+
+            if (equityData) {
+                text += `📊 权益: ${formatNumber(equityData.equity)}  |  浮盈: ${formatProfit(equityData.floatProfit)}`;
+            }
+            return text;
+        },
+
+        detectTodayChanges(oldOrders, newOrders) {
+            const changes = [];
+
+            const oldMap = {};
+            oldOrders.forEach(o => {
+                oldMap[`${o.contract}_${o.direction}`] = o;
+            });
+
+            const newMap = {};
+            newOrders.forEach(o => {
+                newMap[`${o.contract}_${o.direction}`] = o;
+            });
+
+            const allKeys = new Set([...Object.keys(oldMap), ...Object.keys(newMap)]);
+            for (const key of allKeys) {
+                const old = oldMap[key];
+                const current = newMap[key];
+
+                const oldToday = old ? old.todayPos : 0;
+                const newToday = current ? current.todayPos : 0;
+                const yesterdayPos = current ? current.yesterdayPos : (old ? old.yesterdayPos : 0);
+
+                if (oldToday !== newToday) {
+                    const name = current ? current.name : old.name;
+                    const contract = current ? current.contract : old.contract;
+                    const avgPrice = current ? current.avgPrice : (old ? old.avgPrice : 0);
+                    changes.push({
+                        name: name,
+                        contract: contract,
+                        yesterdayPos: yesterdayPos,
+                        oldToday: oldToday,
+                        newToday: newToday,
+                        avgPrice: avgPrice,
+                    });
+                }
+            }
+
+            return changes;
+        },
+
+        // ============================================================
+        // 变化通知排版优化
+        // ============================================================
+
+        generateChangeMessage(changes) {
+            if (!changes || changes.length === 0) return '';
+
+            const added = changes.filter(c => c.oldToday === 0 && c.newToday > 0);
+            const removed = changes.filter(c => c.oldToday > 0 && c.newToday === 0);
+            const qtyChanged = changes.filter(c => c.oldToday > 0 && c.newToday > 0 && c.oldToday !== c.newToday);
+
+            let text = '';
+
+            if (added.length > 0) {
+                text += `🟢 新增 (${added.length} 笔)\n\n`;
+                added.forEach(c => {
+                    text += `▪ ${c.name}\n`;
+                    text += `   ${c.contract}  今仓 ${c.newToday}手  (昨 ${c.yesterdayPos} → 今 ${c.newToday})\n`;
+                    text += `   均价 ${c.avgPrice.toFixed(2)}\n`;
+                    text += '\n';
+                });
+            }
+
+            if (removed.length > 0) {
+                text += `🔴 平仓 (${removed.length} 笔)\n\n`;
+                removed.forEach(c => {
+                    text += `▪ ${c.name}\n`;
+                    text += `   ${c.contract}  今仓 0手  (昨 ${c.yesterdayPos} → 今 0)\n`;
+                    text += '\n';
+                });
+            }
+
+            if (qtyChanged.length > 0) {
+                text += `🟡 手数变化 (${qtyChanged.length} 笔)\n\n`;
+                qtyChanged.forEach(c => {
+                    const diff = c.newToday - c.oldToday;
+                    const sign = diff > 0 ? '+' : '';
+                    text += `▪ ${c.name}\n`;
+                    text += `   ${c.contract}  ${c.oldToday} → ${c.newToday}手  (${sign}${diff})\n`;
+                    text += `   (昨 ${c.yesterdayPos} → 今 ${c.newToday})\n`;
+                    text += '\n';
+                });
+            }
+
+            return text.trim();
+        }
+    };
+
+    // ============================================================
+    // 企业微信推送
+    // ============================================================
+
+    const WeChatPusher = {
+        send(message) {
+            return new Promise((resolve) => {
+                try {
+                    if (message.length > 2000) {
+                        message = message.substring(0, 1990) + '\n...(消息过长已截断)';
+                    }
+
+                    const fullMessage = `📊 【今仓监控】\n\n${message}\n\n⏰ ${formatTime(new Date())}`;
+
+                    const payload = {
+                        msgtype: 'text',
+                        text: {
+                            content: fullMessage
+                        }
+                    };
+
+                    GM_xmlhttpRequest({
+                        method: 'POST',
+                        url: CONFIG.wechatWebhook,
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        data: JSON.stringify(payload),
+                        onload: function(response) {
+                            try {
+                                if (response.status === 200) {
+                                    const result = JSON.parse(response.responseText);
+                                    if (result.errcode === 0) {
+                                        logger.success('推送成功');
+                                        resolve(true);
+                                    } else {
+                                        logger.warn('推送失败:', result);
+                                        resolve(false);
+                                    }
+                                } else {
+                                    logger.warn(`推送失败: HTTP ${response.status}`);
+                                    resolve(false);
+                                }
+                            } catch (e) {
+                                logger.warn('解析推送响应失败:', e);
+                                resolve(false);
+                            }
+                        },
+                        onerror: function(err) {
+                            logger.warn('推送异常:', err);
+                            resolve(false);
+                        }
+                    });
+                } catch (e) {
+                    logger.warn('推送发送异常:', e);
+                    resolve(false);
+                }
+            });
+        },
+
+        sendAndRecord(message) {
+            this.send(message).then(success => {
+                if (success) {
+                    try {
+                        StateManager.addHistory(message);
+                    } catch (e) {}
+                }
+            }).catch(() => {});
+        }
+    };
+
+    // ============================================================
+    // 监控核心
+    // ============================================================
+
+    const Monitor = {
+        lastTodayOrders: null,
+        lastEquityData: null,
+        isInitialized: false,
+        timerId: null,
+        isRunning: false,
+        checkCount: 0,
+
+        init() {
+            try {
+                logger.info('🚀 今仓监控初始化...');
+
+                const savedState = StateManager.loadState();
+
+                if (savedState && savedState.isInitialized) {
+                    this.lastTodayOrders = savedState.orders || [];
+                    this.lastEquityData = savedState.equityData || null;
+                    this.isInitialized = true;
+                    logger.info(`📂 恢复持久化状态成功，今仓记录数: ${this.lastTodayOrders.length}`);
+                    logger.info(`   ⏰ 上次保存时间: ${savedState.timestamp}`);
+                } else {
+                    this.isInitialized = false;
+                    this.lastTodayOrders = [];
+                    this.lastEquityData = null;
+                    logger.info('📌 首次运行，无历史状态');
+                }
+
+                this.createControlPanel();
+                this.isRunning = true;
+
+                setTimeout(() => {
+                    this.checkAndNotify(true);
+                }, 2000);
+
+                this.scheduleNextCheck();
+            } catch (e) {
+                logger.error('初始化失败:', e);
+            }
+        },
+
+        scheduleNextCheck() {
+            try {
+                const interval = getRandomInterval();
+                const minutes = (interval / 60000).toFixed(1);
+                logger.info(`⏰ 下次检查将在 ${minutes} 分钟后执行`);
+
+                if (this.timerId) {
+                    clearTimeout(this.timerId);
+                }
+
+                this.timerId = setTimeout(() => {
+                    try {
+                        this.checkAndNotify(false);
+                    } catch (e) {
+                        logger.warn('检查执行异常:', e);
+                    }
+                    this.scheduleNextCheck();
+                }, interval);
+            } catch (e) {
+                logger.error('调度失败:', e);
+                this.timerId = setTimeout(() => {
+                    this.scheduleNextCheck();
+                }, 300000);
+            }
+        },
+
+        getEquityData() {
+            try {
+                const clubs = document.querySelector('#clubs');
+                if (!clubs) return null;
+
+                const rows = clubs.querySelectorAll('tr');
+                for (const row of rows) {
+                    const cells = row.querySelectorAll('td');
+                    if (cells.length < 7) continue;
+                    const name = cells[0].textContent.trim();
+                    if (name === CONFIG.monitor.roomName) {
+                        return {
+                            name: name,
+                            equity: parseFloat(cells[1].textContent.replace(/,/g, '')) || 0,
+                            margin: parseFloat(cells[2].textContent.replace(/,/g, '')) || 0,
+                            floatProfit: parseFloat(cells[3].textContent.replace(/,/g, '')) || 0,
+                            closeProfit: parseFloat(cells[4].textContent.replace(/,/g, '')) || 0,
+                            usage: cells[5].textContent.trim(),
+                            marketValue: parseFloat(cells[6].textContent.replace(/,/g, '')) || 0,
+                        };
+                    }
+                }
+                return null;
+            } catch (e) {
+                return null;
+            }
+        },
+
+        createControlPanel() {
+            try {
+                const oldPanel = document.getElementById('monitor-today-panel');
+                if (oldPanel) oldPanel.remove();
+
+                const panel = document.createElement('div');
+                panel.id = 'monitor-today-panel';
+                panel.style.cssText = `
+                    position: fixed;
+                    bottom: 20px;
+                    right: 20px;
+                    z-index: 99999;
+                    background: #1a1a2e;
+                    color: #fff;
+                    padding: 12px 16px;
+                    border-radius: 10px;
+                    font-size: 13px;
+                    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+                    box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+                    min-width: 200px;
+                    cursor: move;
+                    user-select: none;
+                    border: 1px solid rgba(255,255,255,0.1);
+                `;
+
+                const statusText = this.isInitialized ? '● 运行中' : '● 首次启动';
+                const statusColor = this.isInitialized ? '#4caf50' : '#ff9800';
+
+                panel.innerHTML = `
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+                        <span style="font-weight:bold;color:#ff9800;">📊 今仓监控</span>
+                        <span id="monitor-today-status" style="color:${statusColor};font-size:12px;">${statusText}</span>
+                    </div>
+                    <div style="font-size:12px;color:#aaa;line-height:1.8;">
+                        <div>今仓笔数: <span id="monitor-today-count" style="color:#fff;">-</span></div>
+                        <div>今仓手数: <span id="monitor-today-total" style="color:#fff;">-</span></div>
+                        <div>状态: <span id="monitor-today-init" style="color:#4fc3f7;font-size:11px;">${this.isInitialized ? '已持久化' : '首次运行'}</span></div>
+                        <div style="font-size:11px;color:#666;margin-top:2px;">
+                            间隔: ${CONFIG.monitor.minInterval}-${CONFIG.monitor.maxInterval}分钟
+                        </div>
+                    </div>
+                    <div style="display:flex;gap:8px;margin-top:8px;">
+                        <button id="monitor-today-pause" style="flex:1;padding:4px 8px;font-size:12px;border:none;border-radius:4px;cursor:pointer;background:#ff6b6b;color:#fff;">⏸ 暂停</button>
+                        <button id="monitor-today-force" style="flex:1;padding:4px 8px;font-size:12px;border:none;border-radius:4px;cursor:pointer;background:#4ecdc4;color:#fff;">📤 立即检查</button>
+                    </div>
+                    <div style="margin-top:4px;font-size:10px;color:#555;text-align:center;">
+                        拖动移动 | 点击按钮控制
+                    </div>
+                `;
+
+                document.body.appendChild(panel);
+
+                let isDragging = false;
+                let dragOffsetX, dragOffsetY;
+                panel.addEventListener('mousedown', (e) => {
+                    if (e.target.tagName === 'BUTTON') return;
+                    isDragging = true;
+                    const rect = panel.getBoundingClientRect();
+                    dragOffsetX = e.clientX - rect.left;
+                    dragOffsetY = e.clientY - rect.top;
+                    panel.style.cursor = 'grabbing';
+                });
+                document.addEventListener('mousemove', (e) => {
+                    if (!isDragging) return;
+                    panel.style.left = (e.clientX - dragOffsetX) + 'px';
+                    panel.style.top = (e.clientY - dragOffsetY) + 'px';
+                    panel.style.right = 'auto';
+                    panel.style.bottom = 'auto';
+                });
+                document.addEventListener('mouseup', () => {
+                    isDragging = false;
+                    panel.style.cursor = 'move';
+                });
+
+                document.getElementById('monitor-today-pause').addEventListener('click', () => {
+                    if (this.isRunning) {
+                        this.pause();
+                        document.getElementById('monitor-today-pause').textContent = '▶ 继续';
+                        document.getElementById('monitor-today-pause').style.background = '#4caf50';
+                        document.getElementById('monitor-today-status').textContent = '● 已暂停';
+                        document.getElementById('monitor-today-status').style.color = '#ff9800';
+                    } else {
+                        this.resume();
+                        document.getElementById('monitor-today-pause').textContent = '⏸ 暂停';
+                        document.getElementById('monitor-today-pause').style.background = '#ff6b6b';
+                        document.getElementById('monitor-today-status').textContent = '● 运行中';
+                        document.getElementById('monitor-today-status').style.color = '#4caf50';
+                        this.updateNextCheckTime();
+                    }
+                });
+
+                document.getElementById('monitor-today-force').addEventListener('click', () => {
+                    this.checkAndNotify(true);
+                    this.updateNextCheckTime();
+                    logger.info('📤 立即检查已触发');
+                });
+
+                this.panel = panel;
+                this.updateNextCheckTime();
+            } catch (e) {
+                logger.warn('创建控制面板失败:', e);
+            }
+        },
+
+        updateNextCheckTime() {
+            try {
+                const el = document.getElementById('monitor-today-next');
+                if (el) {
+                    const interval = getRandomInterval();
+                    const minutes = (interval / 60000).toFixed(1);
+                    el.textContent = `~${minutes} 分钟后`;
+                }
+            } catch (e) {}
+        },
+
+        updatePanel(todayOrders) {
+            try {
+                if (!this.panel) return;
+                const countEl = document.getElementById('monitor-today-count');
+                const totalEl = document.getElementById('monitor-today-total');
+                const hasToday = todayOrders.filter(o => o.todayPos > 0);
+                if (countEl) countEl.textContent = hasToday.length || 0;
+                if (totalEl) {
+                    const total = hasToday.reduce((sum, o) => sum + o.todayPos, 0) || 0;
+                    totalEl.textContent = total;
+                }
+            } catch (e) {}
+        },
+
+        checkAndNotify(forcePush = false) {
+            try {
+                if (!this.isRunning) {
+                    logger.debug('监控已暂停，跳过检查');
+                    return;
+                }
+
+                this.checkCount++;
+                logger.debug(`第 ${this.checkCount} 次检查...`);
+
+                const todayOrders = DataParser.parseTodayPositions();
+                const equityData = this.getEquityData();
+                this.updatePanel(todayOrders);
+
+                if (!this.isInitialized) {
+                    this.isInitialized = true;
+                    this.lastTodayOrders = todayOrders;
+                    this.lastEquityData = equityData;
+
+                    StateManager.saveState(todayOrders, equityData);
+                    logger.info(`📌 首次运行，记录 ${todayOrders.length} 笔数据，已持久化`);
+
+                    let message = '🚀 系统已启动\n\n';
+                    if (todayOrders.length > 0) {
+                        message += DataParser.generateStartupSummary(todayOrders, equityData);
+                    } else {
+                        message += '📋 当前无今仓持仓';
+                    }
+                    WeChatPusher.sendAndRecord(message);
+                    return;
+                }
+
+                const changes = DataParser.detectTodayChanges(this.lastTodayOrders, todayOrders);
+
+                if (changes.length > 0) {
+                    logger.info(`📢 检测到 ${changes.length} 笔今仓变化`);
+                    const changeMsg = DataParser.generateChangeMessage(changes);
+                    WeChatPusher.sendAndRecord(changeMsg);
+                } else if (forcePush) {
+                    const message = `📊 当前状态\n\n${DataParser.generateStartupSummary(todayOrders, equityData)}`;
+                    WeChatPusher.sendAndRecord(message);
+                    logger.info('📤 强制推送完成');
+                } else {
+                    logger.debug('今仓无变化');
+                }
+
+                this.lastTodayOrders = todayOrders;
+                this.lastEquityData = equityData;
+                StateManager.saveState(todayOrders, equityData);
+
+            } catch (e) {
+                logger.warn('检查执行异常:', e);
+            }
+        },
+
+        start() {
+            if (this.isRunning) return;
+            this.isRunning = true;
+            this.scheduleNextCheck();
+            logger.info(`▶️ 监控已启动`);
+        },
+
+        pause() {
+            this.isRunning = false;
+            if (this.timerId) {
+                clearTimeout(this.timerId);
+                this.timerId = null;
+            }
+            logger.info('⏸ 监控已暂停');
+        },
+
+        resume() {
+            if (this.isRunning) return;
+            this.isRunning = true;
+            this.scheduleNextCheck();
+            logger.info('▶️ 监控已继续');
+        },
+
+        stop() {
+            this.pause();
+            if (this.panel) {
+                this.panel.remove();
+                this.panel = null;
+            }
+            logger.info('🛑 监控已完全停止');
+        }
+    };
+
+    // ============================================================
+    // 页面变化监听 - 已禁用
+    // ============================================================
+
+    function setupMutationObserver() {
+        logger.info('👁️ 页面变化监听已禁用（仅使用定时检查）');
+        return;
+    }
+
+    // ============================================================
+    // 导出控制接口
+    // ============================================================
+
+    window.__todayMonitor = {
+        start: () => Monitor.start(),
+        pause: () => Monitor.pause(),
+        resume: () => Monitor.resume(),
+        stop: () => Monitor.stop(),
+        check: (force = false) => Monitor.checkAndNotify(force),
+        status: () => ({
+            isRunning: Monitor.isRunning,
+            isInitialized: Monitor.isInitialized,
+            checkCount: Monitor.checkCount,
+            lastTodayOrders: Monitor.lastTodayOrders,
+            lastEquityData: Monitor.lastEquityData,
+        }),
+        history: () => StateManager.getHistory(),
+        clearHistory: () => {
+            GM_deleteValue(CONFIG.storage.historyKey);
+            logger.success('历史记录已清除');
+        },
+        reset: () => {
+            StateManager.clearState();
+            Monitor.isInitialized = false;
+            Monitor.lastTodayOrders = [];
+            Monitor.lastEquityData = null;
+            Monitor.checkCount = 0;
+            logger.success('已重置所有状态（刷新页面后重新初始化）');
+            setTimeout(() => location.reload(), 1000);
+        },
+        getTodayOrders: () => DataParser.parseTodayPositions(),
+    };
+
+    // ============================================================
+    // 全局错误处理
+    // ============================================================
+
+    window.addEventListener('unhandledrejection', function(e) {
+        if (e.reason && e.reason.message && e.reason.message.includes('message channel closed')) {
+            e.preventDefault();
+            return;
+        }
+    });
+
+    const originalError = console.error;
+    console.error = function() {
+        const args = Array.from(arguments);
+        const msg = args.join(' ');
+        if (msg && msg.includes('message channel closed')) {
+            return;
+        }
+        originalError.apply(console, arguments);
+    };
+
+    // ============================================================
+    // 启动
+    // ============================================================
+
+    logger.info('='.repeat(50));
+    logger.info('  策略研究平台 - 今仓监控 (排版优化版)');
+    logger.info('='.repeat(50));
+    logger.info(`📊 监控目标: 今仓手数变化 (基于昨仓对比)`);
+    logger.info(`⏰ 检查间隔: ${CONFIG.monitor.minInterval}-${CONFIG.monitor.maxInterval} 分钟 (随机)`);
+    logger.info(`📤 推送类型: 启动通知 + 手数变化通知`);
+    logger.info(`💾 持久化: 已启用 (状态保存到本地)`);
+    logger.info('='.repeat(50));
+
+    setTimeout(() => {
+        try {
+            Monitor.init();
+            setupMutationObserver();
+
+            console.log('%c📊 今仓监控控制台命令', 'font-size:16px;font-weight:bold;');
+            console.log('  __todayMonitor.status()       - 查看状态');
+            console.log('  __todayMonitor.check(true)    - 强制检查并推送');
+            console.log('  __todayMonitor.pause()        - 暂停监控');
+            console.log('  __todayMonitor.resume()       - 继续监控');
+            console.log('  __todayMonitor.getTodayOrders() - 获取当前数据');
+            console.log('  __todayMonitor.history()      - 查看推送历史');
+            console.log('  __todayMonitor.reset()        - 重置所有状态（会刷新页面）');
+        } catch (e) {
+            logger.error('启动失败:', e);
+        }
+    }, 1000);
+
+})();
