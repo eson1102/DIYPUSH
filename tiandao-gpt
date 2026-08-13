@@ -1,261 +1,201 @@
 // ==UserScript==
-// @name         策略研究平台 - 今仓变化监控 Pro
-// @namespace    https://hunansanhe.com/
+// @name         今仓变化监控 + 企业微信 + EmailJS
+// @namespace    https://chatgpt.com/
 // @version      4.0.0
-// @description  监控交易页面今仓变化，支持企业微信机器人、EmailJS、后台持续监控、消息模板和控制面板
-// @author       GPT
+// @description  监控交易记录页面今仓数量变化，支持企业微信机器人、EmailJS、自定义消息、运行通知
+// @author       ChatGPT
 //
-// @match        http://m.hunansanhe.com:20008/*
+// @match        http://*/*
+// @match        https://*/*
 //
 // @grant        GM_xmlhttpRequest
-// @grant        GM_getValue
-// @grant        GM_setValue
 // @grant        GM_notification
-// @grant        GM_registerMenuCommand
+// @grant        GM_setValue
+// @grant        GM_getValue
 //
-// @connect      m.hunansanhe.com
 // @connect      qyapi.weixin.qq.com
 // @connect      api.emailjs.com
 //
 // @run-at       document-idle
-// @noframes
 // ==/UserScript==
 
 (function () {
     'use strict';
 
     /************************************************************
-     * 1. 基础配置
-     ************************************************************/
-
-    const VERSION = '4.0.0';
-
-    /*
-     * 只允许这个站点运行。
-     *
-     * 注意：
-     * 不限制 /ht/data.html
-     *
-     * 例如：
-     * http://m.hunansanhe.com:20008/ht/data.html
-     * http://m.hunansanhe.com:20008/ht/test.html
-     * http://m.hunansanhe.com:20008/abc.html
-     *
-     * 都可以运行。
-     */
-
-    const ALLOWED_HOST = 'm.hunansanhe.com';
-    const ALLOWED_PORT = '20008';
-
-    if (
-        location.hostname !== ALLOWED_HOST ||
-        String(location.port) !== ALLOWED_PORT
-    ) {
-        return;
-    }
-
-    /************************************************************
-     * 2. 默认配置
+     * 1. 默认配置
      ************************************************************/
 
     const DEFAULT_CONFIG = {
 
-        enabled: true,
+        // 是否启动监控
+        enabled: false,
 
-        /*
-         * 首次启动：
-         * true = 第一次读取只建立基准，不发送交易通知
-         */
-        firstRunAsBaseline: true,
+        // 检查间隔
+        interval: 5 * 60 * 1000,
 
-        /*
-         * 监控间隔
-         * 单位：秒
-         */
-        interval: 30,
+        // 是否启用企业微信
+        wechatEnabled: true,
 
-        /*
-         * 页面没有数据时是否继续监控
-         */
-        retryWhenNoData: true,
-
-        /*
-         * 企业微信
-         */
-        wecomEnabled: true,
-
-        wecomWebhook:
+        // 企业微信机器人地址
+        wechatWebhook:
             'https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=86748ff7-e6d0-4c5f-b915-958ae95a885b',
 
-        /*
-         * EmailJS
-         */
+        // 是否启用 EmailJS
         emailEnabled: false,
 
+        // EmailJS
         emailServiceId: '',
         emailTemplateId: '',
         emailPublicKey: '',
-        emailAccessToken: '',
+        emailToEmail: '',
 
-        emailTo: '',
+        // 自定义消息
+        messageIncrease:
+            '📈 今仓增加\n\n策略研究室：{{room}}\n品种：{{symbol}}\n今仓：{{today}}\n变化：+{{change}} 手\n\n当前页面：{{url}}\n时间：{{time}}',
 
-        /*
-         * 运行通知
-         *
-         * true：
-         * 启动、停止、异常、建立基准等发送通知
-         */
-        runtimeNotification: true,
+        messageDecrease:
+            '📉 今仓减少\n\n策略研究室：{{room}}\n品种：{{symbol}}\n今仓：{{today}}\n变化：{{change}} 手\n\n当前页面：{{url}}\n时间：{{time}}',
 
-        /*
-         * 本地桌面通知
-         */
-        desktopNotification: true,
+        messageNew:
+            '🆕 今日开新仓\n\n策略研究室：{{room}}\n品种：{{symbol}}\n今仓：{{today}}\n新增：+{{change}} 手\n\n当前页面：{{url}}\n时间：{{time}}',
 
-        /*
-         * 消息模板
-         */
-        tradeMessageTemplate:
-`📊 今仓发生变化
+        messageClear:
+            '🚨 今日仓位已清零\n\n策略研究室：{{room}}\n品种：{{symbol}}\n今仓：0\n减少：{{change}} 手\n\n当前页面：{{url}}\n时间：{{time}}',
 
-策略研究室：{{club}}
+        messageRun:
+            '🟢 今仓监控运行中\n\n今仓笔数：{{count}}\n今仓手数：{{total}}\n\n检查间隔：{{interval}}\n时间：{{time}}',
 
-原今仓：{{old_total}} 手
-当前今仓：{{new_total}} 手
-变化：{{change}} 手
+        // 是否发送运行通知
+        runNotify: true,
 
-{{details}}
+        // 是否发送浏览器通知
+        browserNotify: true,
 
-检查时间：{{time}}`,
+        // 首次启动是否通知
+        startupNotify: true,
 
-        runtimeMessageTemplate:
-`🔔 今仓监控运行通知
-
-状态：{{status}}
-
-页面：{{url}}
-
-当前今仓：{{total}} 手
-
-时间：{{time}}`,
-
-        /*
-         * 是否显示页面控制面板
-         */
-        showPanel: true,
-
-        /*
-         * 面板位置
-         */
-        panelLeft: 20,
-        panelTop: 80
+        // 是否只监控今仓
+        todayOnly: true
     };
 
 
     /************************************************************
-     * 3. 状态
+     * 2. 配置读取 / 保存
      ************************************************************/
 
-    let config = loadConfig();
-
-    let state = {
-
-        running: config.enabled,
-
-        initialized: false,
-
-        lastTotal: null,
-
-        currentTotal: null,
-
-        lastCheckTime: null,
-
-        lastChange: null,
-
-        lastStatus: '等待第一次检查',
-
-        checking: false,
-
-        timer: null,
-
-        observer: null,
-
-        pageReady: false,
-
-        lastDataSignature: '',
-
-        runtimeStartedNotificationSent: false
-    };
-
-
-    /************************************************************
-     * 4. 工具函数
-     ************************************************************/
+    const STORAGE_KEY = 'today_position_monitor_config_v4';
 
     function loadConfig() {
 
-        const saved = GM_getValue('trade_monitor_config', null);
+        try {
 
-        if (!saved) {
+            const raw = localStorage.getItem(STORAGE_KEY);
+
+            if (!raw) {
+                return JSON.parse(JSON.stringify(DEFAULT_CONFIG));
+            }
+
+            const saved = JSON.parse(raw);
+
+            return Object.assign(
+                {},
+                DEFAULT_CONFIG,
+                saved
+            );
+
+        } catch (e) {
+
+            console.error(
+                '[今仓监控] 配置读取失败',
+                e
+            );
+
             return JSON.parse(JSON.stringify(DEFAULT_CONFIG));
         }
-
-        return Object.assign(
-            {},
-            DEFAULT_CONFIG,
-            saved
-        );
     }
+
+
+    let config = loadConfig();
 
 
     function saveConfig() {
 
-        GM_setValue(
-            'trade_monitor_config',
-            config
-        );
+        try {
+
+            localStorage.setItem(
+                STORAGE_KEY,
+                JSON.stringify(config)
+            );
+
+            // 同时 GM 保存一份
+            GM_setValue(
+                STORAGE_KEY,
+                JSON.stringify(config)
+            );
+
+            console.log(
+                '[今仓监控] 配置已保存'
+            );
+
+        } catch (e) {
+
+            console.error(
+                '[今仓监控] 配置保存失败',
+                e
+            );
+        }
     }
 
+
+    /************************************************************
+     * 3. 工具
+     ************************************************************/
 
     function nowString() {
 
         const d = new Date();
 
-        const pad = n => String(n).padStart(2, '0');
+        const pad = n =>
+            String(n).padStart(2, '0');
 
-        return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ` +
-               `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
-    }
-
-
-    function formatNumber(num) {
-
-        if (num === null || num === undefined || isNaN(num)) {
-            return '-';
-        }
-
-        return Number(num).toLocaleString(
-            'zh-CN',
-            {
-                maximumFractionDigits: 2
-            }
+        return (
+            d.getFullYear() +
+            '-' +
+            pad(d.getMonth() + 1) +
+            '-' +
+            pad(d.getDate()) +
+            ' ' +
+            pad(d.getHours()) +
+            ':' +
+            pad(d.getMinutes()) +
+            ':' +
+            pad(d.getSeconds())
         );
     }
 
 
-    function formatChange(num) {
+    function formatInterval(ms) {
 
-        if (num > 0) {
-            return '+' + formatNumber(num);
+        const minutes =
+            Math.round(ms / 60000);
+
+        if (minutes < 60) {
+            return minutes + ' 分钟';
         }
 
-        return formatNumber(num);
+        return (
+            Math.floor(minutes / 60) +
+            ' 小时 ' +
+            minutes % 60 +
+            ' 分钟'
+        );
     }
 
 
     function escapeHtml(str) {
 
-        return String(str ?? '')
+        return String(str)
             .replace(/&/g, '&amp;')
             .replace(/</g, '&lt;')
             .replace(/>/g, '&gt;')
@@ -264,467 +204,286 @@
     }
 
 
-    function parseNumber(value) {
+    /************************************************************
+     * 4. 页面识别
+     ************************************************************/
 
-        if (value === null || value === undefined) {
-            return null;
-        }
+    function isTargetPage() {
 
-        let text = String(value)
-            .replace(/,/g, '')
-            .replace(/，/g, '')
-            .replace(/\s+/g, '')
-            .trim();
+        /*
+         * 不限制具体 URL。
+         *
+         * 通过页面特征判断是不是交易记录页面。
+         */
 
-        if (!text) {
-            return 0;
-        }
+        const bodyText =
+            document.body
+                ? document.body.innerText || ''
+                : '';
 
-        const n = parseFloat(text);
+        const hasProducts =
+            !!document.querySelector('#products');
 
-        return Number.isFinite(n) ? n : null;
+        const hasTradeHeaders =
+            bodyText.includes('品种名称') &&
+            bodyText.includes('今仓') &&
+            bodyText.includes('昨仓');
+
+        const hasStrategy =
+            bodyText.includes('策略研究室');
+
+        return (
+            hasProducts &&
+            hasTradeHeaders &&
+            hasStrategy
+        );
     }
 
 
     /************************************************************
-     * 5. 查找今仓列
+     * 5. 解析今仓
      ************************************************************/
 
-    function findTodayColumnIndex(table) {
+    function getPositionData() {
 
-        if (!table) {
-            return -1;
-        }
+        const result = [];
 
-        const headers = table.querySelectorAll('thead tr:first-child td, thead tr:first-child th');
-
-        let index = -1;
-
-        headers.forEach((cell, i) => {
-
-            const text = cell.innerText.trim();
-
-            if (
-                text === '今仓' ||
-                text.includes('今仓')
-            ) {
-                index = i;
-            }
-        });
-
-        return index;
-    }
-
-
-    /************************************************************
-     * 6. 获取交易数据
-     ************************************************************/
-
-    function getTradeData() {
-
-        /*
-         * 优先使用页面原本的 products 表格
-         */
-        let table = document.querySelector('#products');
-
-        let tbody = table;
+        const tbody =
+            document.querySelector('#products');
 
         if (!tbody) {
-
-            /*
-             * 如果页面结构发生变化，
-             * 尝试寻找包含“今仓”的表格。
-             */
-
-            const tables = document.querySelectorAll('table');
-
-            for (const t of tables) {
-
-                const text = t.innerText || '';
-
-                if (
-                    text.includes('今仓') &&
-                    text.includes('昨仓')
-                ) {
-
-                    tbody = t.querySelector('tbody');
-
-                    if (tbody) {
-                        break;
-                    }
-                }
-            }
+            return result;
         }
 
-        if (!tbody) {
+        const rows =
+            tbody.querySelectorAll('tr');
 
-            return {
-                success: false,
-                reason: '找不到交易数据表格',
-                total: null,
-                rows: []
-            };
-        }
+        rows.forEach((row, index) => {
 
-        /*
-         * 找真正的 table
-         */
-        const tableElement = tbody.closest('table');
+            const cells =
+                row.querySelectorAll('td');
 
-        const todayIndex =
-            findTodayColumnIndex(tableElement);
-
-        if (todayIndex < 0) {
-
-            return {
-                success: false,
-                reason: '找不到“今仓”列',
-                total: null,
-                rows: []
-            };
-        }
-
-        const rows = tbody.querySelectorAll('tr');
-
-        let total = 0;
-
-        let validRowCount = 0;
-
-        const details = [];
-
-        rows.forEach(row => {
-
-            const cells = row.querySelectorAll('td,th');
-
-            if (!cells.length) {
+            if (cells.length < 12) {
                 return;
             }
-
-            if (todayIndex >= cells.length) {
-                return;
-            }
-
-            const name =
-                cells[0]?.innerText.trim() || '';
 
             const symbol =
-                cells[1]?.innerText.trim() || '';
+                cells[1].innerText.trim();
 
             const direction =
-                cells[2]?.innerText.trim() || '';
+                cells[2].innerText.trim();
+
+            const positionText =
+                cells[3].innerText.trim();
+
+            const yesterdayText =
+                cells[9].innerText.trim();
 
             const todayText =
-                cells[todayIndex]?.innerText.trim() || '';
+                cells[10].innerText.trim();
+
+            const price =
+                cells[11].innerText.trim();
+
+            const position =
+                parseNumber(positionText);
+
+            const yesterday =
+                parseNumber(yesterdayText);
 
             const today =
                 parseNumber(todayText);
 
-            if (today === null) {
-                return;
-            }
+            result.push({
 
-            total += today;
+                index,
 
-            validRowCount++;
+                name:
+                    cells[0].innerText.trim(),
 
-            details.push({
-                name,
                 symbol,
+
                 direction,
-                today
+
+                position,
+
+                yesterday,
+
+                today,
+
+                price
             });
         });
 
+        return result;
+    }
 
-        /*
-         * 如果没有任何有效行，
-         * 不认为今仓是 0。
-         */
-        if (validRowCount === 0) {
 
-            return {
-                success: false,
-                reason: '没有读取到有效今仓数据',
-                total: null,
-                rows: []
-            };
+    function parseNumber(value) {
+
+        if (
+            value === null ||
+            value === undefined ||
+            value === ''
+        ) {
+            return 0;
         }
 
+        const n =
+            parseFloat(
+                String(value)
+                    .replace(/,/g, '')
+                    .replace(/[^\d.-]/g, '')
+            );
 
-        /*
-         * 获取策略研究室名称
-         */
-        let club = '';
+        return isNaN(n)
+            ? 0
+            : n;
+    }
 
-        const clubTable =
-            document.querySelector('#clubs');
 
-        if (clubTable) {
+    /************************************************************
+     * 6. 今仓统计
+     ************************************************************/
 
-            const firstRow =
-                clubTable.querySelector('tr');
+    function getTodaySummary() {
 
-            if (firstRow) {
+        const positions =
+            getPositionData();
 
-                club =
-                    firstRow.querySelector('td')?.innerText.trim() || '';
+        let total = 0;
+
+        let count = 0;
+
+        positions.forEach(item => {
+
+            if (item.today > 0) {
+
+                count++;
+
+                total += item.today;
             }
-        }
-
+        });
 
         return {
 
-            success: true,
+            positions,
 
-            total,
+            count,
 
-            rows: details,
-
-            club,
-
-            time: nowString()
+            total
         };
     }
 
 
     /************************************************************
-     * 7. 生成明细
+     * 7. 保存上一次状态
      ************************************************************/
 
-    function buildDetails(rows) {
+    const STATE_KEY =
+        'today_position_monitor_state_v4';
 
-        if (!rows || !rows.length) {
-            return '无品种明细';
+
+    function loadState() {
+
+        try {
+
+            const raw =
+                localStorage.getItem(STATE_KEY);
+
+            if (!raw) {
+                return null;
+            }
+
+            return JSON.parse(raw);
+
+        } catch (e) {
+
+            return null;
         }
+    }
 
-        return rows
-            .map(item => {
 
-                return `${item.name || item.symbol} ` +
-                       `${item.today}手`;
-            })
-            .join('\n');
+    function saveState(state) {
+
+        localStorage.setItem(
+            STATE_KEY,
+            JSON.stringify(state)
+        );
     }
 
 
     /************************************************************
-     * 8. 模板变量
+     * 8. 页面信息
      ************************************************************/
 
-    function renderTemplate(template, data) {
+    function getRoomName() {
 
-        return String(template || '')
-            .replace(/\{\{club\}\}/g,
-                data.club ?? '')
-            .replace(/\{\{old_total\}\}/g,
-                formatNumber(data.oldTotal))
-            .replace(/\{\{new_total\}\}/g,
-                formatNumber(data.newTotal))
-            .replace(/\{\{change\}\}/g,
-                formatChange(data.change))
-            .replace(/\{\{total\}\}/g,
-                formatNumber(data.total))
-            .replace(/\{\{details\}\}/g,
-                data.details ?? '')
-            .replace(/\{\{time\}\}/g,
-                data.time ?? nowString())
-            .replace(/\{\{status\}\}/g,
-                data.status ?? '')
-            .replace(/\{\{url\}\}/g,
-                location.href);
+        const row =
+            document.querySelector(
+                '#clubs tr'
+            );
+
+        if (!row) {
+            return '';
+        }
+
+        const cell =
+            row.querySelector('td');
+
+        return cell
+            ? cell.innerText.trim()
+            : '';
     }
 
 
     /************************************************************
-     * 9. 企业微信
+     * 9. 消息模板
      ************************************************************/
 
-    function sendWeCom(text) {
+    function renderMessage(
+        template,
+        data
+    ) {
 
-        if (!config.wecomEnabled) {
-            return Promise.resolve({
-                success: false,
-                skipped: true
-            });
-        }
+        let result =
+            template;
 
-        const webhook =
-            String(config.wecomWebhook || '').trim();
+        Object.keys(data).forEach(key => {
 
-        if (!webhook) {
-
-            return Promise.resolve({
-                success: false,
-                reason: '企业微信 Webhook 未配置'
-            });
-        }
-
-
-        return new Promise(resolve => {
-
-            GM_xmlhttpRequest({
-
-                method: 'POST',
-
-                url: webhook,
-
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-
-                data: JSON.stringify({
-
-                    msgtype: 'text',
-
-                    text: {
-                        content: text
-                    }
-
-                }),
-
-                timeout: 10000,
-
-                onload: function (response) {
-
-                    let data = null;
-
-                    try {
-                        data = JSON.parse(response.responseText);
-                    } catch (e) {}
-
-                    if (
-                        response.status >= 200 &&
-                        response.status < 300 &&
-                        (!data || data.errcode === 0)
-                    ) {
-
-                        resolve({
-                            success: true,
-                            response: data
-                        });
-
-                    } else {
-
-                        resolve({
-                            success: false,
-                            reason:
-                                data?.errmsg ||
-                                `HTTP ${response.status}`,
-                            response: data
-                        });
-                    }
-                },
-
-                onerror: function (error) {
-
-                    resolve({
-                        success: false,
-                        reason: '企业微信请求失败',
-                        error
-                    });
-                },
-
-                ontimeout: function () {
-
-                    resolve({
-                        success: false,
-                        reason: '企业微信请求超时'
-                    });
-                }
-
-            });
-
+            result =
+                result.replace(
+                    new RegExp(
+                        '\\{\\{' +
+                        key +
+                        '\\}\\}',
+                        'g'
+                    ),
+                    data[key]
+                );
         });
+
+        return result;
     }
 
 
     /************************************************************
-     * 10. EmailJS
+     * 10. 企业微信
      ************************************************************/
 
-    function sendEmailJS(text, subject = '策略研究平台 - 今仓变化') {
-
-        if (!config.emailEnabled) {
-
-            return Promise.resolve({
-                success: false,
-                skipped: true
-            });
-        }
-
-
-        const serviceId =
-            String(config.emailServiceId || '').trim();
-
-        const templateId =
-            String(config.emailTemplateId || '').trim();
-
-        const publicKey =
-            String(config.emailPublicKey || '').trim();
-
-        const accessToken =
-            String(config.emailAccessToken || '').trim();
-
-        const toEmail =
-            String(config.emailTo || '').trim();
-
+    function sendWechat(text) {
 
         if (
-            !serviceId ||
-            !templateId ||
-            !publicKey
+            !config.wechatEnabled ||
+            !config.wechatWebhook
         ) {
 
-            return Promise.resolve({
-                success: false,
-                reason: 'EmailJS 配置不完整'
-            });
+            console.log(
+                '[今仓监控] 企业微信未启用'
+            );
+
+            return Promise.resolve(false);
         }
-
-
-        /*
-         * EmailJS REST API
-         *
-         * https://api.emailjs.com/api/v1.0/email/send
-         */
-
-        const body = {
-
-            service_id: serviceId,
-
-            template_id: templateId,
-
-            user_id: publicKey,
-
-            template_params: {
-
-                message: text,
-
-                subject: subject,
-
-                to_email: toEmail,
-
-                time: nowString(),
-
-                page_url: location.href,
-
-                old_total:
-                    state.lastTotal ?? '',
-
-                new_total:
-                    state.currentTotal ?? '',
-
-                change:
-                    state.lastChange ?? ''
-            }
-        };
-
-
-        if (accessToken) {
-
-            body.accessToken = accessToken;
-        }
-
 
         return new Promise(resolve => {
 
@@ -732,57 +491,59 @@
 
                 method: 'POST',
 
-                url: 'https://api.emailjs.com/api/v1.0/email/send',
+                url:
+                    config.wechatWebhook,
 
                 headers: {
-                    'Content-Type': 'application/json'
+
+                    'Content-Type':
+                        'application/json'
                 },
 
-                data: JSON.stringify(body),
+                data:
+                    JSON.stringify({
+
+                        msgtype: 'text',
+
+                        text: {
+
+                            content: text
+                        }
+                    }),
 
                 timeout: 15000,
 
                 onload: function (response) {
 
-                    if (
+                    console.log(
+                        '[今仓监控] 企业微信返回',
+                        response.responseText
+                    );
+
+                    resolve(
                         response.status >= 200 &&
                         response.status < 300
-                    ) {
-
-                        resolve({
-                            success: true,
-                            response: response.responseText
-                        });
-
-                    } else {
-
-                        resolve({
-                            success: false,
-                            reason:
-                                `EmailJS HTTP ${response.status}`,
-                            response:
-                                response.responseText
-                        });
-                    }
+                    );
                 },
 
                 onerror: function (error) {
 
-                    resolve({
-                        success: false,
-                        reason: 'EmailJS 请求失败',
+                    console.error(
+                        '[今仓监控] 企业微信发送失败',
                         error
-                    });
+                    );
+
+                    resolve(false);
                 },
 
                 ontimeout: function () {
 
-                    resolve({
-                        success: false,
-                        reason: 'EmailJS 请求超时'
-                    });
-                }
+                    console.error(
+                        '[今仓监控] 企业微信请求超时'
+                    );
 
+                    resolve(false);
+                }
             });
 
         });
@@ -790,12 +551,124 @@
 
 
     /************************************************************
-     * 11. 桌面通知
+     * 11. EmailJS
      ************************************************************/
 
-    function desktopNotify(title, text) {
+    function sendEmail(text) {
 
-        if (!config.desktopNotification) {
+        if (
+            !config.emailEnabled
+        ) {
+            return Promise.resolve(false);
+        }
+
+        if (
+            !config.emailServiceId ||
+            !config.emailTemplateId ||
+            !config.emailPublicKey
+        ) {
+
+            console.warn(
+                '[今仓监控] EmailJS 参数不完整'
+            );
+
+            return Promise.resolve(false);
+        }
+
+
+        const data = {
+
+            service_id:
+                config.emailServiceId,
+
+            template_id:
+                config.emailTemplateId,
+
+            user_id:
+                config.emailPublicKey,
+
+            template_params: {
+
+                to_email:
+                    config.emailToEmail,
+
+                subject:
+                    '今仓变化通知',
+
+                message:
+                    text,
+
+                content:
+                    text
+            }
+        };
+
+
+        return new Promise(resolve => {
+
+            GM_xmlhttpRequest({
+
+                method: 'POST',
+
+                url:
+                    'https://api.emailjs.com/api/v1.0/email/send',
+
+                headers: {
+
+                    'Content-Type':
+                        'application/json'
+                },
+
+                data:
+                    JSON.stringify(data),
+
+                timeout: 15000,
+
+                onload: function (response) {
+
+                    console.log(
+                        '[今仓监控] EmailJS 返回',
+                        response.status,
+                        response.responseText
+                    );
+
+                    resolve(
+                        response.status >= 200 &&
+                        response.status < 300
+                    );
+                },
+
+                onerror: function (error) {
+
+                    console.error(
+                        '[今仓监控] EmailJS 发送失败',
+                        error
+                    );
+
+                    resolve(false);
+                },
+
+                ontimeout: function () {
+
+                    console.error(
+                        '[今仓监控] EmailJS 请求超时'
+                    );
+
+                    resolve(false);
+                }
+            });
+
+        });
+    }
+
+
+    /************************************************************
+     * 12. 浏览器通知
+     ************************************************************/
+
+    function browserNotify(title, text) {
+
+        if (!config.browserNotify) {
             return;
         }
 
@@ -808,2167 +681,1861 @@
                 text,
 
                 timeout: 8000
-
             });
 
-        } catch (e) {}
+        } catch (e) {
+
+            console.warn(
+                '[今仓监控] 浏览器通知失败',
+                e
+            );
+        }
     }
 
 
     /************************************************************
-     * 12. 发送统一消息
+     * 13. 统一推送
      ************************************************************/
 
-    async function sendNotification(
-        text,
-        subject = '策略研究平台'
+    async function pushMessage(
+        title,
+        text
     ) {
 
-        updatePanelStatus(
-            '正在发送通知...',
-            'sending'
+        console.log(
+            '[今仓监控]',
+            title,
+            text
         );
 
+        browserNotify(
+            title,
+            text
+        );
 
-        const results = await Promise.allSettled([
+        const tasks = [];
 
-            sendWeCom(text),
+        if (config.wechatEnabled) {
 
-            sendEmailJS(text, subject)
-
-        ]);
-
-
-        const wecom =
-            results[0]?.value;
-
-        const email =
-            results[1]?.value;
-
-
-        const successList = [];
-
-
-        if (wecom?.success) {
-            successList.push('企业微信');
+            tasks.push(
+                sendWechat(text)
+            );
         }
 
-        if (email?.success) {
-            successList.push('EmailJS');
+        if (config.emailEnabled) {
+
+            tasks.push(
+                sendEmail(text)
+            );
         }
 
+        if (!tasks.length) {
 
-        if (successList.length) {
+            console.warn(
+                '[今仓监控] 没有启用任何推送渠道'
+            );
 
-            state.lastStatus =
-                '通知成功：' +
-                successList.join(' + ');
-
-            updatePanel();
-
-        } else {
-
-            state.lastStatus =
-                '通知未发送';
-
-            updatePanel();
-        }
-
-
-        return {
-            wecom,
-            email
-        };
-    }
-
-
-    /************************************************************
-     * 13. 运行通知
-     ************************************************************/
-
-    async function sendRuntimeNotification(status) {
-
-        if (!config.runtimeNotification) {
             return;
         }
 
-
-        const data = {
-
-            status,
-
-            total:
-                state.currentTotal,
-
-            time:
-                nowString(),
-
-            url:
-                location.href
-        };
-
-
-        const text =
-            renderTemplate(
-                config.runtimeMessageTemplate,
-                data
-            );
-
-
-        await sendNotification(
-            text,
-            '策略研究平台 - 运行通知'
-        );
+        await Promise.allSettled(tasks);
     }
 
 
     /************************************************************
-     * 14. 检查今仓
+     * 14. 检测变化
      ************************************************************/
 
-    async function checkTodayPosition(
+    let checking = false;
+
+
+    async function checkNow(
         force = false
     ) {
 
-        if (state.checking) {
+        if (checking) {
             return;
         }
 
-        if (!state.running && !force) {
+        if (!isTargetPage()) {
+
+            console.log(
+                '[今仓监控] 当前页面不是目标页面'
+            );
+
             return;
         }
 
-
-        state.checking = true;
-
+        checking = true;
 
         try {
 
-            const data =
-                getTradeData();
+            const summary =
+                getTodaySummary();
+
+            updatePanel(
+                summary
+            );
 
 
-            if (!data.success) {
+            const current = {
 
-                state.lastStatus =
-                    data.reason;
+                date:
+                    new Date()
+                        .toISOString()
+                        .slice(0, 10),
 
-                updatePanel();
+                positions:
+                    summary.positions.map(item => ({
+                        symbol:
+                            item.symbol,
 
-                return;
-            }
+                        name:
+                            item.name,
+
+                        today:
+                            item.today
+                    })),
+
+                count:
+                    summary.count,
+
+                total:
+                    summary.total
+            };
 
 
-            state.pageReady = true;
-
-            state.currentTotal =
-                data.total;
-
-            state.lastCheckTime =
-                nowString();
+            const previous =
+                loadState();
 
 
             /*
-             * 第一次读取
+             * 第一次运行：
+             *
+             * 只建立基准。
+             *
+             * 不把昨天的仓位当成今天变化。
              */
-            if (!state.initialized) {
 
-                state.lastTotal =
-                    data.total;
+            if (
+                !previous ||
+                previous.date !== current.date
+            ) {
 
-                state.initialized = true;
+                saveState(current);
 
-                state.lastChange = 0;
+                updatePanel(
+                    summary,
+                    '已建立今日基准'
+                );
 
-                state.lastStatus =
-                    `已建立基准：${formatNumber(data.total)} 手`;
-
-                saveMonitorState();
-
-                updatePanel();
-
-
-                /*
-                 * 首次启动不通知交易变化
-                 */
-                if (!config.firstRunAsBaseline) {
+                if (
+                    force &&
+                    config.startupNotify
+                ) {
 
                     const text =
-                        renderTemplate(
-                            config.tradeMessageTemplate,
+                        renderMessage(
+                            config.messageRun,
                             {
-                                club: data.club,
-                                oldTotal: 0,
-                                newTotal: data.total,
-                                total: data.total,
-                                change: data.total,
-                                details:
-                                    buildDetails(data.rows),
-                                time: data.time
+
+                                count:
+                                    summary.count,
+
+                                total:
+                                    summary.total,
+
+                                interval:
+                                    formatInterval(
+                                        config.interval
+                                    ),
+
+                                time:
+                                    nowString()
                             }
                         );
 
-                    await sendNotification(
-                        text,
-                        '策略研究平台 - 初始今仓'
+                    await pushMessage(
+                        '监控启动',
+                        text
                     );
                 }
 
-
                 return;
             }
 
 
             /*
-             * 和上一次进行比较
+             * 比较每个合约的今仓
              */
-            const oldTotal =
-                state.lastTotal;
 
-            const newTotal =
-                data.total;
+            const previousMap =
+                {};
 
-            const change =
-                newTotal - oldTotal;
+            previous.positions.forEach(item => {
 
-
-            /*
-             * 没变化
-             */
-            if (change === 0) {
-
-                state.lastStatus =
-                    '无变化';
-
-                updatePanel();
-
-                return;
-            }
+                previousMap[
+                    item.symbol
+                ] = item;
+            });
 
 
-            /*
-             * 发生变化
-             */
-            state.lastChange =
-                change;
+            let changed = false;
 
 
-            state.lastStatus =
-                change > 0
-                    ? `今仓增加 ${formatNumber(change)} 手`
-                    : `今仓减少 ${formatNumber(Math.abs(change))} 手`;
+            for (
+                const item
+                of current.positions
+            ) {
+
+                const old =
+                    previousMap[
+                        item.symbol
+                    ];
 
 
-            /*
-             * 先更新基准
-             */
-            state.lastTotal =
-                newTotal;
+                const oldToday =
+                    old
+                        ? old.today
+                        : 0;
 
 
-            saveMonitorState();
+                const newToday =
+                    item.today;
 
-            updatePanel();
+
+                if (
+                    oldToday === newToday
+                ) {
+                    continue;
+                }
 
 
-            /*
-             * 构建消息
-             */
-            const text =
-                renderTemplate(
-                    config.tradeMessageTemplate,
-                    {
-                        club: data.club,
-                        oldTotal,
-                        newTotal,
-                        total: newTotal,
-                        change,
-                        details:
-                            buildDetails(data.rows),
-                        time: data.time
-                    }
+                changed = true;
+
+
+                const delta =
+                    newToday - oldToday;
+
+
+                const room =
+                    getRoomName();
+
+
+                const data = {
+
+                    room,
+
+                    symbol:
+                        item.name +
+                        ' ' +
+                        item.symbol,
+
+                    today:
+                        newToday,
+
+                    change:
+                        Math.abs(delta),
+
+                    url:
+                        location.href,
+
+                    time:
+                        nowString()
+                };
+
+
+                let template;
+
+
+                /*
+                 * 0 -> N
+                 */
+
+                if (
+                    oldToday === 0 &&
+                    newToday > 0
+                ) {
+
+                    template =
+                        config.messageNew;
+
+                }
+
+                /*
+                 * N -> 0
+                 */
+
+                else if (
+                    oldToday > 0 &&
+                    newToday === 0
+                ) {
+
+                    template =
+                        config.messageClear;
+
+                }
+
+                /*
+                 * 增加
+                 */
+
+                else if (
+                    delta > 0
+                ) {
+
+                    template =
+                        config.messageIncrease;
+
+                }
+
+                /*
+                 * 减少
+                 */
+
+                else {
+
+                    template =
+                        config.messageDecrease;
+                }
+
+
+                const text =
+                    renderMessage(
+                        template,
+                        data
+                    );
+
+
+                await pushMessage(
+                    delta > 0
+                        ? '今仓增加'
+                        : '今仓减少',
+                    text
                 );
+            }
 
 
             /*
-             * 页面通知
+             * 保存最新状态
              */
-            desktopNotify(
-                change > 0
-                    ? '📈 今仓增加'
-                    : '📉 今仓减少',
-                `${formatNumber(oldTotal)} → ${formatNumber(newTotal)} 手`
+
+            saveState(current);
+
+
+            updatePanel(
+                summary,
+                changed
+                    ? '检测到变化，已推送'
+                    : '无变化'
             );
 
-
-            /*
-             * 企业微信 + EmailJS
-             */
-            await sendNotification(
-                text,
-                change > 0
-                    ? '策略研究平台 - 今仓增加'
-                    : '策略研究平台 - 今仓减少'
-            );
-
-        } catch (error) {
+        } catch (e) {
 
             console.error(
                 '[今仓监控] 检查异常',
-                error
+                e
             );
 
-            state.lastStatus =
-                '检查异常：' +
-                (error?.message || error);
-
-            updatePanel();
+            updatePanel(
+                null,
+                '检查异常'
+            );
 
         } finally {
 
-            state.checking = false;
+            checking = false;
         }
     }
 
 
     /************************************************************
-     * 15. 保存监控状态
+     * 15. 定时器
      ************************************************************/
 
-    function saveMonitorState() {
-
-        GM_setValue(
-            'trade_monitor_state',
-            {
-                initialized:
-                    state.initialized,
-
-                lastTotal:
-                    state.lastTotal,
-
-                currentTotal:
-                    state.currentTotal,
-
-                lastChange:
-                    state.lastChange,
-
-                lastStatus:
-                    state.lastStatus
-            }
-        );
-    }
+    let monitorTimer = null;
 
 
-    /************************************************************
-     * 16. 恢复监控状态
-     ************************************************************/
+    function startMonitor() {
 
-    function loadMonitorState() {
+        stopMonitor();
 
-        const saved =
-            GM_getValue(
-                'trade_monitor_state',
-                null
-            );
-
-        if (!saved) {
-            return;
-        }
-
-        state.initialized =
-            !!saved.initialized;
-
-        state.lastTotal =
-            saved.lastTotal ?? null;
-
-        state.currentTotal =
-            saved.currentTotal ?? null;
-
-        state.lastChange =
-            saved.lastChange ?? null;
-
-        state.lastStatus =
-            saved.lastStatus ||
-            '已恢复监控状态';
-    }
-
-
-    /************************************************************
-     * 17. 启动监控
-     ************************************************************/
-
-    function startMonitoring() {
-
-        stopMonitoring(false);
-
-
-        state.running = true;
 
         config.enabled = true;
 
         saveConfig();
 
 
-        /*
-         * 立即检查一次
-         */
-        checkTodayPosition(true);
+        updateButton();
 
 
         /*
-         * 定时器
+         * 立即执行一次
          */
-        state.timer =
+
+        checkNow(true);
+
+
+        monitorTimer =
             setInterval(
                 () => {
 
-                    checkTodayPosition(false);
+                    checkNow(false);
 
                 },
-                Math.max(
-                    5,
-                    Number(config.interval) || 30
-                ) * 1000
+                config.interval
             );
 
 
-        state.lastStatus =
-            '监控运行中';
+        updatePanel(
+            null,
+            '监控已启动'
+        );
 
-        updatePanel();
 
-
-        /*
-         * 运行通知只发送一次
-         */
-        if (
-            !state.runtimeStartedNotificationSent
-        ) {
-
-            state.runtimeStartedNotificationSent =
-                true;
-
-            sendRuntimeNotification(
-                '监控已启动'
-            );
-        }
+        console.log(
+            '[今仓监控] 已启动'
+        );
     }
 
 
-    /************************************************************
-     * 18. 停止监控
-     ************************************************************/
+    function stopMonitor() {
 
-    function stopMonitoring(
-        sendNotificationFlag = true
-    ) {
-
-        if (state.timer) {
+        if (monitorTimer) {
 
             clearInterval(
-                state.timer
+                monitorTimer
             );
 
-            state.timer = null;
+            monitorTimer = null;
         }
 
-
-        state.running = false;
 
         config.enabled = false;
 
         saveConfig();
 
 
-        state.lastStatus =
-            '监控已暂停';
-
-        updatePanel();
+        updateButton();
 
 
-        if (sendNotificationFlag) {
-
-            sendRuntimeNotification(
-                '监控已暂停'
-            );
-        }
-    }
+        updatePanel(
+            null,
+            '监控已停止'
+        );
 
 
-    /************************************************************
-     * 19. 重新建立基准
-     ************************************************************/
-
-    async function resetBaseline() {
-
-        const data =
-            getTradeData();
-
-
-        if (!data.success) {
-
-            alert(
-                '无法建立基准：' +
-                data.reason
-            );
-
-            return;
-        }
-
-
-        state.initialized = true;
-
-        state.lastTotal =
-            data.total;
-
-        state.currentTotal =
-            data.total;
-
-        state.lastChange = 0;
-
-        state.lastStatus =
-            `基准已重置：${formatNumber(data.total)} 手`;
-
-
-        saveMonitorState();
-
-        updatePanel();
-
-
-        await sendRuntimeNotification(
-            `基准已重置为 ${formatNumber(data.total)} 手`
+        console.log(
+            '[今仓监控] 已停止'
         );
     }
 
 
     /************************************************************
-     * 20. 页面数据变化监听
+     * 16. DOM 变化监听
      *
-     * 不依赖页面是否在前台。
+     * 防止页面 AJAX 更新以后，
+     * 必须等 5 分钟才发现。
      *
-     * AJAX 更新 DOM 后，可以提前触发检查。
+     * 这里不立即重复推送，
+     * 只是提前触发检查。
      ************************************************************/
 
-    function startMutationObserver() {
+    let mutationTimer = null;
 
-        if (state.observer) {
-            return;
-        }
 
+    function setupMutationObserver() {
 
         const target =
-            document.querySelector('#products') ||
-            document.body;
-
+            document.querySelector(
+                '#products'
+            );
 
         if (!target) {
             return;
         }
 
 
-        let debounceTimer = null;
+        const observer =
+            new MutationObserver(
+                function () {
+
+                    if (!config.enabled) {
+                        return;
+                    }
 
 
-        state.observer =
-            new MutationObserver(() => {
-
-                clearTimeout(
-                    debounceTimer
-                );
+                    clearTimeout(
+                        mutationTimer
+                    );
 
 
-                debounceTimer =
-                    setTimeout(() => {
+                    mutationTimer =
+                        setTimeout(
+                            () => {
 
-                        if (
-                            state.running
-                        ) {
+                                checkNow(false);
 
-                            checkTodayPosition(false);
-                        }
-
-                    }, 1500);
-
-            });
+                            },
+                            1000
+                        );
+                }
+            );
 
 
-        state.observer.observe(
+        observer.observe(
             target,
             {
+
                 childList: true,
+
                 subtree: true,
+
                 characterData: true
             }
+        );
+
+
+        console.log(
+            '[今仓监控] DOM监听已启动'
         );
     }
 
 
     /************************************************************
-     * 21. 控制面板 CSS
+     * 17. 控制面板
      ************************************************************/
 
-    function injectStyle() {
+    let panel;
 
-        const style =
-            document.createElement('style');
-
-        style.id =
-            'trade-monitor-style';
-
-        style.textContent = `
-
-        #trade-monitor-panel {
-
-            position: fixed;
-
-            z-index: 2147483647;
-
-            width: 350px;
-
-            background: #151922;
-
-            color: #fff;
-
-            border: 1px solid #343b4a;
-
-            border-radius: 12px;
-
-            box-shadow:
-                0 10px 40px rgba(0,0,0,.45);
-
-            font-family:
-                -apple-system,
-                BlinkMacSystemFont,
-                "Segoe UI",
-                "Microsoft YaHei",
-                sans-serif;
-
-            font-size: 13px;
-
-            overflow: hidden;
-
-            user-select: none;
-        }
-
-
-        #trade-monitor-panel .tm-header {
-
-            height: 48px;
-
-            display: flex;
-
-            align-items: center;
-
-            justify-content: space-between;
-
-            padding: 0 14px;
-
-            background: #1d2330;
-
-            cursor: move;
-        }
-
-
-        #trade-monitor-panel .tm-title {
-
-            font-weight: 700;
-
-            font-size: 15px;
-        }
-
-
-        #trade-monitor-panel .tm-version {
-
-            font-size: 10px;
-
-            color: #687386;
-
-            margin-left: 6px;
-        }
-
-
-        #trade-monitor-panel .tm-close {
-
-            cursor: pointer;
-
-            color: #9aa4b5;
-
-            font-size: 20px;
-
-            line-height: 1;
-        }
-
-
-        #trade-monitor-panel .tm-close:hover {
-
-            color: #fff;
-        }
-
-
-        #trade-monitor-panel .tm-body {
-
-            padding: 14px;
-        }
-
-
-        #trade-monitor-panel .tm-status {
-
-            display: flex;
-
-            align-items: center;
-
-            gap: 8px;
-
-            margin-bottom: 12px;
-        }
-
-
-        #trade-monitor-panel .tm-dot {
-
-            width: 9px;
-
-            height: 9px;
-
-            border-radius: 50%;
-
-            background: #666;
-
-            flex: 0 0 auto;
-        }
-
-
-        #trade-monitor-panel .tm-dot.running {
-
-            background: #22c55e;
-
-            box-shadow:
-                0 0 8px rgba(34,197,94,.7);
-        }
-
-
-        #trade-monitor-panel .tm-dot.paused {
-
-            background: #ef4444;
-        }
-
-
-        #trade-monitor-panel .tm-dot.sending {
-
-            background: #f59e0b;
-
-            box-shadow:
-                0 0 8px rgba(245,158,11,.7);
-        }
-
-
-        #trade-monitor-panel .tm-grid {
-
-            display: grid;
-
-            grid-template-columns:
-                1fr 1fr;
-
-            gap: 8px;
-
-            margin-bottom: 12px;
-        }
-
-
-        #trade-monitor-panel .tm-card {
-
-            background: #1d2330;
-
-            border-radius: 8px;
-
-            padding: 10px;
-        }
-
-
-        #trade-monitor-panel .tm-label {
-
-            color: #8d98aa;
-
-            font-size: 11px;
-
-            margin-bottom: 5px;
-        }
-
-
-        #trade-monitor-panel .tm-value {
-
-            font-size: 19px;
-
-            font-weight: 700;
-        }
-
-
-        #trade-monitor-panel .tm-change-up {
-
-            color: #ef4444;
-        }
-
-
-        #trade-monitor-panel .tm-change-down {
-
-            color: #22c55e;
-        }
-
-
-        #trade-monitor-panel .tm-info {
-
-            background: #11151d;
-
-            border-radius: 8px;
-
-            padding: 10px;
-
-            line-height: 1.8;
-
-            color: #aab3c2;
-
-            margin-bottom: 12px;
-
-            word-break: break-all;
-        }
-
-
-        #trade-monitor-panel .tm-info b {
-
-            color: #fff;
-
-            font-weight: 500;
-        }
-
-
-        #trade-monitor-panel .tm-buttons {
-
-            display: grid;
-
-            grid-template-columns:
-                1fr 1fr;
-
-            gap: 8px;
-
-            margin-bottom: 8px;
-        }
-
-
-        #trade-monitor-panel button {
-
-            border: 0;
-
-            border-radius: 7px;
-
-            padding: 8px 5px;
-
-            cursor: pointer;
-
-            color: #fff;
-
-            font-size: 12px;
-
-            background: #30394a;
-        }
-
-
-        #trade-monitor-panel button:hover {
-
-            filter: brightness(1.15);
-        }
-
-
-        #trade-monitor-panel .tm-start {
-
-            background: #16a34a;
-        }
-
-
-        #trade-monitor-panel .tm-stop {
-
-            background: #dc2626;
-        }
-
-
-        #trade-monitor-panel .tm-check {
-
-            background: #2563eb;
-        }
-
-
-        #trade-monitor-panel .tm-reset {
-
-            background: #7c3aed;
-        }
-
-
-        #trade-monitor-panel .tm-config {
-
-            width: 100%;
-
-            background: #374151;
-
-            margin-top: 2px;
-        }
-
-
-        #trade-monitor-panel .tm-config-area {
-
-            display: none;
-
-            margin-top: 10px;
-
-            border-top: 1px solid #303746;
-
-            padding-top: 12px;
-        }
-
-
-        #trade-monitor-panel .tm-config-area.show {
-
-            display: block;
-        }
-
-
-        #trade-monitor-panel .tm-section {
-
-            margin-bottom: 15px;
-        }
-
-
-        #trade-monitor-panel .tm-section-title {
-
-            font-size: 12px;
-
-            font-weight: 700;
-
-            color: #d8dee9;
-
-            margin-bottom: 8px;
-        }
-
-
-        #trade-monitor-panel label {
-
-            display: block;
-
-            color: #8d98aa;
-
-            font-size: 11px;
-
-            margin: 7px 0 4px;
-        }
-
-
-        #trade-monitor-panel input,
-        #trade-monitor-panel textarea {
-
-            width: 100%;
-
-            box-sizing: border-box;
-
-            background: #0e1219;
-
-            color: #fff;
-
-            border: 1px solid #343b4a;
-
-            border-radius: 6px;
-
-            padding: 7px;
-
-            outline: none;
-
-            font-size: 12px;
-        }
-
-
-        #trade-monitor-panel textarea {
-
-            min-height: 100px;
-
-            resize: vertical;
-
-            line-height: 1.5;
-        }
-
-
-        #trade-monitor-panel input:focus,
-        #trade-monitor-panel textarea:focus {
-
-            border-color: #4f8cff;
-        }
-
-
-        #trade-monitor-panel .tm-checkbox {
-
-            display: flex;
-
-            align-items: center;
-
-            gap: 7px;
-
-            color: #b9c2d0;
-
-            margin: 8px 0;
-
-        }
-
-
-        #trade-monitor-panel .tm-checkbox input {
-
-            width: auto;
-        }
-
-
-        #trade-monitor-panel .tm-help {
-
-            color: #687386;
-
-            font-size: 10px;
-
-            line-height: 1.6;
-
-            margin-top: 4px;
-        }
-
-
-        #trade-monitor-panel .tm-footer {
-
-            text-align: center;
-
-            color: #4f596a;
-
-            font-size: 10px;
-
-            padding-top: 5px;
-        }
-
-        `;
-
-        document.head.appendChild(style);
-    }
-
-
-    /************************************************************
-     * 22. 创建控制面板
-     ************************************************************/
 
     function createPanel() {
 
-        if (!config.showPanel) {
+        if (panel) {
             return;
         }
 
 
-        if (
-            document.getElementById(
-                'trade-monitor-panel'
-            )
-        ) {
-            return;
-        }
+        panel =
+            document.createElement(
+                'div'
+            );
 
-
-        injectStyle();
-
-
-        const panel =
-            document.createElement('div');
 
         panel.id =
-            'trade-monitor-panel';
-
-
-        panel.style.left =
-            config.panelLeft + 'px';
-
-        panel.style.top =
-            config.panelTop + 'px';
+            'today-monitor-panel';
 
 
         panel.innerHTML = `
 
-        <div class="tm-header">
+            <div class="tm-header">
 
-            <div>
-
-                <span class="tm-title">
+                <div class="tm-title">
                     📊 今仓监控
-                </span>
-
-                <span class="tm-version">
-                    v${VERSION}
-                </span>
-
-            </div>
-
-            <span class="tm-close">
-                ×
-            </span>
-
-        </div>
-
-
-        <div class="tm-body">
-
-            <div class="tm-status">
-
-                <span
-                    class="tm-dot"
-                    id="tm-dot">
-                </span>
-
-                <span id="tm-status-text">
-                    等待检查
-                </span>
-
-            </div>
-
-
-            <div class="tm-grid">
-
-                <div class="tm-card">
-
-                    <div class="tm-label">
-                        上次今仓
-                    </div>
-
-                    <div
-                        class="tm-value"
-                        id="tm-old">
-                        -
-                    </div>
-
                 </div>
 
-
-                <div class="tm-card">
-
-                    <div class="tm-label">
-                        当前今仓
-                    </div>
-
-                    <div
-                        class="tm-value"
-                        id="tm-current">
-                        -
-                    </div>
-
-                </div>
-
-
-                <div class="tm-card">
-
-                    <div class="tm-label">
-                        本次变化
-                    </div>
-
-                    <div
-                        class="tm-value"
-                        id="tm-change">
-                        -
-                    </div>
-
-                </div>
-
-
-                <div class="tm-card">
-
-                    <div class="tm-label">
-                        检查间隔
-                    </div>
-
-                    <div
-                        class="tm-value"
-                        id="tm-interval">
-                        ${config.interval}s
-                    </div>
-
+                <div
+                    id="tm-status"
+                    class="tm-status"
+                >
+                    未启动
                 </div>
 
             </div>
 
 
-            <div class="tm-info">
+            <div class="tm-body">
 
-                <div>
-                    状态：
-                    <b id="tm-last-status">
-                        -
-                    </b>
+                <div class="tm-row">
+                    <span>今仓笔数</span>
+                    <b id="tm-count">0</b>
                 </div>
 
-                <div>
-                    最后检查：
-                    <b id="tm-last-check">
-                        -
-                    </b>
+                <div class="tm-row">
+                    <span>今仓手数</span>
+                    <b id="tm-total">0</b>
                 </div>
 
-                <div>
-                    页面：
-                    <b id="tm-page">
-                        ${escapeHtml(location.pathname)}
-                    </b>
+                <div class="tm-row">
+                    <span>检查间隔</span>
+                    <b id="tm-interval"></b>
                 </div>
 
-            </div>
+                <div
+                    id="tm-message"
+                    class="tm-message"
+                >
+                    等待启动
+                </div>
 
-
-            <div class="tm-buttons">
 
                 <button
+                    id="tm-start"
                     class="tm-start"
-                    id="tm-start">
+                >
                     ▶ 启动监控
                 </button>
 
+
                 <button
-                    class="tm-stop"
-                    id="tm-stop">
-                    ⏸ 暂停监控
+                    id="tm-settings"
+                    class="tm-settings"
+                >
+                    ⚙ 设置
                 </button>
 
             </div>
-
-
-            <div class="tm-buttons">
-
-                <button
-                    class="tm-check"
-                    id="tm-check">
-                    🔍 立即检查
-                </button>
-
-                <button
-                    class="tm-reset"
-                    id="tm-reset">
-                    ♻ 重建基准
-                </button>
-
-            </div>
-
-
-            <button
-                class="tm-config"
-                id="tm-config">
-                ⚙ 设置
-            </button>
-
-
-            <div
-                class="tm-config-area"
-                id="tm-config-area">
-
-
-                <!-- 基础设置 -->
-
-                <div class="tm-section">
-
-                    <div class="tm-section-title">
-                        基础设置
-                    </div>
-
-
-                    <label>
-                        监控间隔（秒）
-                    </label>
-
-                    <input
-                        type="number"
-                        min="5"
-                        id="cfg-interval"
-                        value="${config.interval}">
-
-
-                    <div class="tm-checkbox">
-
-                        <input
-                            type="checkbox"
-                            id="cfg-runtime"
-                            ${config.runtimeNotification ? 'checked' : ''}>
-
-                        <span>
-                            发送运行通知
-                        </span>
-
-                    </div>
-
-
-                    <div class="tm-checkbox">
-
-                        <input
-                            type="checkbox"
-                            id="cfg-desktop"
-                            ${config.desktopNotification ? 'checked' : ''}>
-
-                        <span>
-                            浏览器桌面通知
-                        </span>
-
-                    </div>
-
-                </div>
-
-
-                <!-- 企业微信 -->
-
-                <div class="tm-section">
-
-                    <div class="tm-section-title">
-                        企业微信群机器人
-                    </div>
-
-
-                    <div class="tm-checkbox">
-
-                        <input
-                            type="checkbox"
-                            id="cfg-wecom-enabled"
-                            ${config.wecomEnabled ? 'checked' : ''}>
-
-                        <span>
-                            启用企业微信
-                        </span>
-
-                    </div>
-
-
-                    <label>
-                        Webhook 地址
-                    </label>
-
-                    <input
-                        type="text"
-                        id="cfg-wecom"
-                        value="${escapeHtml(config.wecomWebhook)}">
-
-                </div>
-
-
-                <!-- EmailJS -->
-
-                <div class="tm-section">
-
-                    <div class="tm-section-title">
-                        EmailJS
-                    </div>
-
-
-                    <div class="tm-checkbox">
-
-                        <input
-                            type="checkbox"
-                            id="cfg-email-enabled"
-                            ${config.emailEnabled ? 'checked' : ''}>
-
-                        <span>
-                            启用 EmailJS
-                        </span>
-
-                    </div>
-
-
-                    <label>
-                        Service ID
-                    </label>
-
-                    <input
-                        type="text"
-                        id="cfg-email-service"
-                        value="${escapeHtml(config.emailServiceId)}">
-
-
-                    <label>
-                        Template ID
-                    </label>
-
-                    <input
-                        type="text"
-                        id="cfg-email-template"
-                        value="${escapeHtml(config.emailTemplateId)}">
-
-
-                    <label>
-                        Public Key
-                    </label>
-
-                    <input
-                        type="text"
-                        id="cfg-email-public"
-                        value="${escapeHtml(config.emailPublicKey)}">
-
-
-                    <label>
-                        Access Token（可选）
-                    </label>
-
-                    <input
-                        type="text"
-                        id="cfg-email-token"
-                        value="${escapeHtml(config.emailAccessToken)}">
-
-
-                    <label>
-                        收件邮箱
-                    </label>
-
-                    <input
-                        type="text"
-                        id="cfg-email-to"
-                        value="${escapeHtml(config.emailTo)}">
-
-
-                    <div class="tm-help">
-
-                        EmailJS 模板中建议使用：
-                        {{message}}、
-                        {{subject}}、
-                        {{to_email}}、
-                        {{time}}、
-                        {{page_url}}
-
-                    </div>
-
-                </div>
-
-
-                <!-- 交易消息 -->
-
-                <div class="tm-section">
-
-                    <div class="tm-section-title">
-                        交易变化消息模板
-                    </div>
-
-
-                    <textarea
-                        id="cfg-trade-template"
-                    >${escapeHtml(config.tradeMessageTemplate)}</textarea>
-
-
-                    <div class="tm-help">
-
-                        可用变量：<br>
-
-                        {{club}}
-                        {{old_total}}
-                        {{new_total}}
-                        {{change}}
-                        {{details}}
-                        {{time}}
-
-                    </div>
-
-                </div>
-
-
-                <!-- 运行消息 -->
-
-                <div class="tm-section">
-
-                    <div class="tm-section-title">
-                        运行通知模板
-                    </div>
-
-
-                    <textarea
-                        id="cfg-runtime-template"
-                    >${escapeHtml(config.runtimeMessageTemplate)}</textarea>
-
-
-                    <div class="tm-help">
-
-                        可用变量：<br>
-
-                        {{status}}
-                        {{total}}
-                        {{time}}
-                        {{url}}
-
-                    </div>
-
-                </div>
-
-
-                <button
-                    id="tm-save-config"
-                    style="
-                        width:100%;
-                        background:#2563eb;
-                        margin-bottom:8px;
-                    ">
-                    💾 保存设置并重启监控
-                </button>
-
-
-                <button
-                    id="tm-test"
-                    style="
-                        width:100%;
-                        background:#0891b2;
-                    ">
-                    📤 测试推送
-                </button>
-
-            </div>
-
-
-            <div class="tm-footer">
-
-                仅监控：
-                ${ALLOWED_HOST}:${ALLOWED_PORT}
-
-            </div>
-
-        </div>
         `;
 
 
-        document.body.appendChild(panel);
+        document.body.appendChild(
+            panel
+        );
 
 
-        bindPanelEvents();
+        document
+            .querySelector('#tm-start')
+            .addEventListener(
+                'click',
+                function () {
+
+                    if (config.enabled) {
+
+                        stopMonitor();
+
+                    } else {
+
+                        startMonitor();
+                    }
+                }
+            );
+
+
+        document
+            .querySelector('#tm-settings')
+            .addEventListener(
+                'click',
+                showSettings
+            );
+
+
+        updateButton();
 
         updatePanel();
     }
 
 
     /************************************************************
-     * 23. 面板事件
+     * 18. 面板 CSS
      ************************************************************/
 
-    function bindPanelEvents() {
+    function injectStyle() {
 
-        const panel =
-            document.getElementById(
-                'trade-monitor-panel'
+        const style =
+            document.createElement(
+                'style'
             );
 
+
+        style.textContent = `
+
+            #today-monitor-panel {
+
+                position: fixed;
+
+                right: 20px;
+
+                bottom: 20px;
+
+                width: 245px;
+
+                z-index: 2147483647;
+
+                background:
+                    #1a1a2e;
+
+                color: #fff;
+
+                border:
+                    1px solid
+                    rgba(255,255,255,.12);
+
+                border-radius:
+                    12px;
+
+                box-shadow:
+                    0 8px 35px
+                    rgba(0,0,0,.35);
+
+                font-family:
+                    -apple-system,
+                    BlinkMacSystemFont,
+                    "Segoe UI",
+                    "Microsoft YaHei",
+                    sans-serif;
+
+                overflow:
+                    hidden;
+            }
+
+
+            #today-monitor-panel
+            .tm-header {
+
+                padding:
+                    12px 14px;
+
+                display:
+                    flex;
+
+                justify-content:
+                    space-between;
+
+                align-items:
+                    center;
+
+                background:
+                    #20203a;
+            }
+
+
+            .tm-title {
+
+                font-weight:
+                    700;
+
+                font-size:
+                    14px;
+            }
+
+
+            .tm-status {
+
+                font-size:
+                    11px;
+
+                color:
+                    #aaa;
+            }
+
+
+            .tm-body {
+
+                padding:
+                    12px 14px;
+            }
+
+
+            .tm-row {
+
+                display:
+                    flex;
+
+                justify-content:
+                    space-between;
+
+                line-height:
+                    28px;
+
+                font-size:
+                    12px;
+
+                color:
+                    #aaa;
+            }
+
+
+            .tm-row b {
+
+                color:
+                    #fff;
+
+                font-size:
+                    13px;
+            }
+
+
+            .tm-message {
+
+                margin:
+                    8px 0;
+
+                padding:
+                    7px 8px;
+
+                border-radius:
+                    6px;
+
+                background:
+                    rgba(255,255,255,.05);
+
+                color:
+                    #aaa;
+
+                font-size:
+                    11px;
+            }
+
+
+            .tm-start,
+            .tm-settings {
+
+                width:
+                    100%;
+
+                border:
+                    0;
+
+                border-radius:
+                    6px;
+
+                padding:
+                    8px;
+
+                margin-top:
+                    7px;
+
+                cursor:
+                    pointer;
+
+                color:
+                    #fff;
+
+                font-size:
+                    12px;
+            }
+
+
+            .tm-start {
+
+                background:
+                    #16a085;
+            }
+
+
+            .tm-start.running {
+
+                background:
+                    #e74c3c;
+            }
+
+
+            .tm-settings {
+
+                background:
+                    #34495e;
+            }
+
+
+            #tm-settings-panel {
+
+                position:
+                    fixed;
+
+                top:
+                    50%;
+
+                left:
+                    50%;
+
+                transform:
+                    translate(-50%,-50%);
+
+                width:
+                    650px;
+
+                max-height:
+                    85vh;
+
+                overflow-y:
+                    auto;
+
+                z-index:
+                    2147483647;
+
+                background:
+                    #171725;
+
+                color:
+                    #fff;
+
+                border-radius:
+                    14px;
+
+                box-shadow:
+                    0 15px 60px
+                    rgba(0,0,0,.6);
+
+                font-family:
+                    -apple-system,
+                    BlinkMacSystemFont,
+                    "Segoe UI",
+                    "Microsoft YaHei",
+                    sans-serif;
+            }
+
+
+            .tm-mask {
+
+                position:
+                    fixed;
+
+                inset:
+                    0;
+
+                background:
+                    rgba(0,0,0,.55);
+
+                z-index:
+                    2147483646;
+            }
+
+
+            .tm-settings-header {
+
+                padding:
+                    16px 20px;
+
+                border-bottom:
+                    1px solid
+                    rgba(255,255,255,.08);
+
+                display:
+                    flex;
+
+                justify-content:
+                    space-between;
+            }
+
+
+            .tm-settings-body {
+
+                padding:
+                    20px;
+            }
+
+
+            .tm-field {
+
+                margin-bottom:
+                    16px;
+            }
+
+
+            .tm-field label {
+
+                display:
+                    block;
+
+                margin-bottom:
+                    6px;
+
+                color:
+                    #aaa;
+
+                font-size:
+                    12px;
+            }
+
+
+            .tm-field input,
+            .tm-field textarea {
+
+                width:
+                    100%;
+
+                box-sizing:
+                    border-box;
+
+                border:
+                    1px solid
+                    #33334a;
+
+                background:
+                    #10101b;
+
+                color:
+                    #fff;
+
+                border-radius:
+                    6px;
+
+                padding:
+                    9px;
+
+                outline:
+                    none;
+            }
+
+
+            .tm-field textarea {
+
+                min-height:
+                    90px;
+
+                resize:
+                    vertical;
+            }
+
+
+            .tm-checkbox {
+
+                display:
+                    flex;
+
+                align-items:
+                    center;
+
+                gap:
+                    8px;
+
+                margin:
+                    8px 0;
+
+                font-size:
+                    12px;
+
+                color:
+                    #ccc;
+            }
+
+
+            .tm-settings-footer {
+
+                display:
+                    flex;
+
+                gap:
+                    10px;
+
+                padding:
+                    15px 20px;
+
+                border-top:
+                    1px solid
+                    rgba(255,255,255,.08);
+            }
+
+
+            .tm-save,
+            .tm-cancel {
+
+                flex:
+                    1;
+
+                border:
+                    0;
+
+                padding:
+                    10px;
+
+                border-radius:
+                    6px;
+
+                color:
+                    #fff;
+
+                cursor:
+                    pointer;
+            }
+
+
+            .tm-save {
+
+                background:
+                    #16a085;
+            }
+
+
+            .tm-cancel {
+
+                background:
+                    #34495e;
+            }
+
+        `;
+
+
+        document.head.appendChild(
+            style
+        );
+    }
+
+
+    /************************************************************
+     * 19. 更新按钮
+     ************************************************************/
+
+    function updateButton() {
+
+        const button =
+            document.querySelector(
+                '#tm-start'
+            );
+
+        const status =
+            document.querySelector(
+                '#tm-status'
+            );
+
+
+        if (!button) {
+            return;
+        }
+
+
+        if (config.enabled) {
+
+            button.innerHTML =
+                '⏹ 停止监控';
+
+            button.classList.add(
+                'running'
+            );
+
+
+            if (status) {
+
+                status.innerHTML =
+                    '● 运行中';
+
+                status.style.color =
+                    '#2ecc71';
+            }
+
+        } else {
+
+            button.innerHTML =
+                '▶ 启动监控';
+
+            button.classList.remove(
+                'running'
+            );
+
+
+            if (status) {
+
+                status.innerHTML =
+                    '● 已停止';
+
+                status.style.color =
+                    '#aaa';
+            }
+        }
+    }
+
+
+    /************************************************************
+     * 20. 更新面板
+     ************************************************************/
+
+    function updatePanel(
+        summary,
+        message
+    ) {
 
         if (!panel) {
             return;
         }
 
 
-        /*
-         * 关闭
-         */
+        if (summary) {
 
-        panel.querySelector(
-            '.tm-close'
-        ).onclick = function () {
-
-            panel.style.display =
-                'none';
-        };
-
-
-        /*
-         * 设置
-         */
-
-        document.getElementById(
-            'tm-config'
-        ).onclick = function () {
-
-            const area =
-                document.getElementById(
-                    'tm-config-area'
+            const count =
+                document.querySelector(
+                    '#tm-count'
                 );
 
-            area.classList.toggle(
-                'show'
-            );
-        };
+            const total =
+                document.querySelector(
+                    '#tm-total'
+                );
 
 
-        /*
-         * 启动
-         */
-
-        document.getElementById(
-            'tm-start'
-        ).onclick = function () {
-
-            startMonitoring();
-        };
-
-
-        /*
-         * 暂停
-         */
-
-        document.getElementById(
-            'tm-stop'
-        ).onclick = function () {
-
-            stopMonitoring(true);
-        };
-
-
-        /*
-         * 立即检查
-         */
-
-        document.getElementById(
-            'tm-check'
-        ).onclick = function () {
-
-            checkTodayPosition(true);
-        };
-
-
-        /*
-         * 重建基准
-         */
-
-        document.getElementById(
-            'tm-reset'
-        ).onclick = function () {
-
-            if (
-                confirm(
-                    '确定使用当前今仓重新建立基准？\n\n建立后不会因为当前数字而产生交易变化通知。'
-                )
-            ) {
-
-                resetBaseline();
+            if (count) {
+                count.textContent =
+                    summary.count;
             }
-        };
 
 
-        /*
-         * 保存设置
-         */
-
-        document.getElementById(
-            'tm-save-config'
-        ).onclick = function () {
-
-            savePanelConfig();
-
-        };
+            if (total) {
+                total.textContent =
+                    summary.total;
+            }
+        }
 
 
-        /*
-         * 测试推送
-         */
-
-        document.getElementById(
-            'tm-test'
-        ).onclick = async function () {
-
-            const text =
-`🔔 策略研究平台测试消息
-
-今仓监控运行正常。
-
-当前今仓：
-${formatNumber(state.currentTotal)} 手
-
-时间：
-${nowString()}`;
-
-
-            await sendNotification(
-                text,
-                '策略研究平台 - 测试消息'
+        const interval =
+            document.querySelector(
+                '#tm-interval'
             );
 
-            alert(
-                '测试推送已执行，请检查企业微信 / 邮箱。'
+
+        if (interval) {
+
+            interval.textContent =
+                formatInterval(
+                    config.interval
+                );
+        }
+
+
+        const msg =
+            document.querySelector(
+                '#tm-message'
             );
-        };
 
 
-        /*
-         * 拖动
-         */
+        if (msg && message) {
 
-        makePanelDraggable(panel);
+            msg.textContent =
+                message;
+        }
+
+
+        updateButton();
     }
 
 
     /************************************************************
-     * 24. 保存面板设置
+     * 21. 设置面板
      ************************************************************/
 
-    function savePanelConfig() {
+    function showSettings() {
 
-        config.interval =
-            Math.max(
-                5,
-                Number(
-                    document.getElementById(
-                        'cfg-interval'
-                    ).value
-                ) || 30
+        if (
+            document.querySelector(
+                '#tm-settings-panel'
+            )
+        ) {
+            return;
+        }
+
+
+        const mask =
+            document.createElement(
+                'div'
+            );
+
+        mask.className =
+            'tm-mask';
+
+
+        const modal =
+            document.createElement(
+                'div'
+            );
+
+        modal.id =
+            'tm-settings-panel';
+
+
+        modal.innerHTML = `
+
+            <div class="tm-settings-header">
+
+                <b>⚙ 今仓监控设置</b>
+
+                <span
+                    id="tm-close-settings"
+                    style="cursor:pointer;color:#aaa;font-size:18px;"
+                >
+                    ×
+                </span>
+
+            </div>
+
+
+            <div class="tm-settings-body">
+
+
+                <div class="tm-field">
+
+                    <label>
+                        监控间隔（分钟）
+                    </label>
+
+                    <input
+                        id="tm-set-interval"
+                        type="number"
+                        min="1"
+                        value="${config.interval / 60000}"
+                    >
+
+                </div>
+
+
+                <div class="tm-checkbox">
+
+                    <input
+                        id="tm-set-wechat"
+                        type="checkbox"
+                        ${config.wechatEnabled ? 'checked' : ''}
+                    >
+
+                    <span>
+                        启用企业微信
+                    </span>
+
+                </div>
+
+
+                <div class="tm-field">
+
+                    <label>
+                        企业微信机器人 Webhook
+                    </label>
+
+                    <input
+                        id="tm-set-webhook"
+                        value="${escapeHtml(config.wechatWebhook)}"
+                    >
+
+                </div>
+
+
+                <div class="tm-checkbox">
+
+                    <input
+                        id="tm-set-email"
+                        type="checkbox"
+                        ${config.emailEnabled ? 'checked' : ''}
+                    >
+
+                    <span>
+                        启用 EmailJS
+                    </span>
+
+                </div>
+
+
+                <div class="tm-field">
+
+                    <label>
+                        EmailJS Service ID
+                    </label>
+
+                    <input
+                        id="tm-set-service"
+                        value="${escapeHtml(config.emailServiceId)}"
+                    >
+
+                </div>
+
+
+                <div class="tm-field">
+
+                    <label>
+                        EmailJS Template ID
+                    </label>
+
+                    <input
+                        id="tm-set-template"
+                        value="${escapeHtml(config.emailTemplateId)}"
+                    >
+
+                </div>
+
+
+                <div class="tm-field">
+
+                    <label>
+                        EmailJS Public Key
+                    </label>
+
+                    <input
+                        id="tm-set-public"
+                        value="${escapeHtml(config.emailPublicKey)}"
+                    >
+
+                </div>
+
+
+                <div class="tm-field">
+
+                    <label>
+                        接收邮箱
+                    </label>
+
+                    <input
+                        id="tm-set-email-to"
+                        value="${escapeHtml(config.emailToEmail)}"
+                    >
+
+                </div>
+
+
+                <div class="tm-checkbox">
+
+                    <input
+                        id="tm-set-run"
+                        type="checkbox"
+                        ${config.runNotify ? 'checked' : ''}
+                    >
+
+                    <span>
+                        启动时发送运行通知
+                    </span>
+
+                </div>
+
+
+                <div class="tm-checkbox">
+
+                    <input
+                        id="tm-set-browser"
+                        type="checkbox"
+                        ${config.browserNotify ? 'checked' : ''}
+                    >
+
+                    <span>
+                        浏览器通知
+                    </span>
+
+                </div>
+
+
+                <div class="tm-checkbox">
+
+                    <input
+                        id="tm-set-startup"
+                        type="checkbox"
+                        ${config.startupNotify ? 'checked' : ''}
+                    >
+
+                    <span>
+                        首次建立今日基准时发送通知
+                    </span>
+
+                </div>
+
+
+                <div class="tm-field">
+
+                    <label>
+                        🆕 新开仓消息
+                    </label>
+
+                    <textarea id="tm-msg-new">${escapeHtml(config.messageNew)}</textarea>
+
+                </div>
+
+
+                <div class="tm-field">
+
+                    <label>
+                        📈 加仓消息
+                    </label>
+
+                    <textarea id="tm-msg-increase">${escapeHtml(config.messageIncrease)}</textarea>
+
+                </div>
+
+
+                <div class="tm-field">
+
+                    <label>
+                        📉 减仓消息
+                    </label>
+
+                    <textarea id="tm-msg-decrease">${escapeHtml(config.messageDecrease)}</textarea>
+
+                </div>
+
+
+                <div class="tm-field">
+
+                    <label>
+                        🚨 清仓消息
+                    </label>
+
+                    <textarea id="tm-msg-clear">${escapeHtml(config.messageClear)}</textarea>
+
+                </div>
+
+
+                <div class="tm-field">
+
+                    <label>
+                        🟢 运行通知消息
+                    </label>
+
+                    <textarea id="tm-msg-run">${escapeHtml(config.messageRun)}</textarea>
+
+                </div>
+
+
+                <div
+                    style="
+                    font-size:11px;
+                    color:#777;
+                    line-height:1.7;
+                    "
+                >
+
+                    可用变量：
+
+                    <br>
+
+                    {{room}}
+                    {{symbol}}
+                    {{today}}
+                    {{change}}
+                    {{count}}
+                    {{total}}
+                    {{interval}}
+                    {{url}}
+                    {{time}}
+
+                </div>
+
+            </div>
+
+
+            <div class="tm-settings-footer">
+
+                <button
+                    id="tm-save-settings"
+                    class="tm-save"
+                >
+                    💾 保存设置
+                </button>
+
+                <button
+                    id="tm-cancel-settings"
+                    class="tm-cancel"
+                >
+                    取消
+                </button>
+
+            </div>
+        `;
+
+
+        document.body.appendChild(
+            mask
+        );
+
+        document.body.appendChild(
+            modal
+        );
+
+
+        document
+            .querySelector(
+                '#tm-save-settings'
+            )
+            .addEventListener(
+                'click',
+                saveSettingsFromPanel
             );
 
 
-        config.runtimeNotification =
-            document.getElementById(
-                'cfg-runtime'
-            ).checked;
+        document
+            .querySelector(
+                '#tm-cancel-settings'
+            )
+            .addEventListener(
+                'click',
+                closeSettings
+            );
 
 
-        config.desktopNotification =
-            document.getElementById(
-                'cfg-desktop'
-            ).checked;
+        document
+            .querySelector(
+                '#tm-close-settings'
+            )
+            .addEventListener(
+                'click',
+                closeSettings
+            );
 
 
-        config.wecomEnabled =
-            document.getElementById(
-                'cfg-wecom-enabled'
-            ).checked;
+        /*
+         * 点击遮罩关闭
+         */
+
+        mask.addEventListener(
+            'click',
+            closeSettings
+        );
+    }
 
 
-        config.wecomWebhook =
-            document.getElementById(
-                'cfg-wecom'
-            ).value.trim();
+    /************************************************************
+     * 22. 保存设置
+     ************************************************************/
+
+    function saveSettingsFromPanel() {
+
+        const get =
+            id =>
+                document.querySelector(id);
+
+
+        const intervalMinutes =
+            parseInt(
+                get('#tm-set-interval').value,
+                10
+            );
+
+
+        config.interval =
+            Math.max(
+                1,
+                intervalMinutes || 5
+            ) * 60000;
+
+
+        config.wechatEnabled =
+            get('#tm-set-wechat').checked;
+
+
+        config.wechatWebhook =
+            get('#tm-set-webhook').value.trim();
 
 
         config.emailEnabled =
-            document.getElementById(
-                'cfg-email-enabled'
-            ).checked;
+            get('#tm-set-email').checked;
 
 
         config.emailServiceId =
-            document.getElementById(
-                'cfg-email-service'
-            ).value.trim();
+            get('#tm-set-service').value.trim();
 
 
         config.emailTemplateId =
-            document.getElementById(
-                'cfg-email-template'
-            ).value.trim();
+            get('#tm-set-template').value.trim();
 
 
         config.emailPublicKey =
-            document.getElementById(
-                'cfg-email-public'
-            ).value.trim();
+            get('#tm-set-public').value.trim();
 
 
-        config.emailAccessToken =
-            document.getElementById(
-                'cfg-email-token'
-            ).value.trim();
+        config.emailToEmail =
+            get('#tm-set-email-to').value.trim();
 
 
-        config.emailTo =
-            document.getElementById(
-                'cfg-email-to'
-            ).value.trim();
+        config.runNotify =
+            get('#tm-set-run').checked;
 
 
-        config.tradeMessageTemplate =
-            document.getElementById(
-                'cfg-trade-template'
-            ).value;
+        config.browserNotify =
+            get('#tm-set-browser').checked;
 
 
-        config.runtimeMessageTemplate =
-            document.getElementById(
-                'cfg-runtime-template'
-            ).value;
+        config.startupNotify =
+            get('#tm-set-startup').checked;
 
+
+        config.messageNew =
+            get('#tm-msg-new').value;
+
+
+        config.messageIncrease =
+            get('#tm-msg-increase').value;
+
+
+        config.messageDecrease =
+            get('#tm-msg-decrease').value;
+
+
+        config.messageClear =
+            get('#tm-msg-clear').value;
+
+
+        config.messageRun =
+            get('#tm-msg-run').value;
+
+
+        /*
+         * 关键：
+         *
+         * 保存设置
+         */
 
         saveConfig();
 
 
-        alert(
-            '设置已保存，监控将重新启动。'
+        /*
+         * 如果监控已经运行，
+         * 重建定时器，
+         * 使新的间隔立即生效。
+         */
+
+        if (config.enabled) {
+
+            startMonitor();
+
+        } else {
+
+            updateButton();
+
+            updatePanel(
+                null,
+                '设置已保存'
+            );
+        }
+
+
+        closeSettings();
+
+
+        /*
+         * 明确提示用户已经保存
+         */
+
+        browserNotify(
+            '今仓监控',
+            '设置已保存'
         );
 
 
-        startMonitoring();
+        console.log(
+            '[今仓监控] 设置保存完成',
+            config
+        );
     }
 
 
     /************************************************************
-     * 25. 更新控制面板
+     * 23. 关闭设置
      ************************************************************/
 
-    function updatePanelStatus(
-        text,
-        type = 'normal'
-    ) {
+    function closeSettings() {
 
-        const dot =
-            document.getElementById(
-                'tm-dot'
+        const modal =
+            document.querySelector(
+                '#tm-settings-panel'
             );
 
-        const status =
-            document.getElementById(
-                'tm-status-text'
+        const mask =
+            document.querySelector(
+                '.tm-mask'
             );
 
 
-        if (!dot || !status) {
-            return;
+        if (modal) {
+            modal.remove();
         }
 
-
-        dot.className =
-            'tm-dot ' +
-            type;
-
-
-        status.textContent =
-            text;
-    }
-
-
-    function updatePanel() {
-
-        const oldEl =
-            document.getElementById(
-                'tm-old'
-            );
-
-        const currentEl =
-            document.getElementById(
-                'tm-current'
-            );
-
-        const changeEl =
-            document.getElementById(
-                'tm-change'
-            );
-
-        const intervalEl =
-            document.getElementById(
-                'tm-interval'
-            );
-
-        const statusEl =
-            document.getElementById(
-                'tm-last-status'
-            );
-
-        const checkEl =
-            document.getElementById(
-                'tm-last-check'
-            );
-
-
-        if (!oldEl) {
-            return;
+        if (mask) {
+            mask.remove();
         }
-
-
-        oldEl.textContent =
-            state.lastTotal === null
-                ? '-'
-                : formatNumber(state.lastTotal);
-
-
-        currentEl.textContent =
-            state.currentTotal === null
-                ? '-'
-                : formatNumber(state.currentTotal);
-
-
-        changeEl.textContent =
-            state.lastChange === null
-                ? '-'
-                : formatChange(state.lastChange);
-
-
-        changeEl.className =
-            'tm-value ' +
-            (
-                state.lastChange > 0
-                    ? 'tm-change-up'
-                    : state.lastChange < 0
-                        ? 'tm-change-down'
-                        : ''
-            );
-
-
-        intervalEl.textContent =
-            config.interval + 's';
-
-
-        statusEl.textContent =
-            state.lastStatus || '-';
-
-
-        checkEl.textContent =
-            state.lastCheckTime || '-';
-
-
-        updatePanelStatus(
-
-            state.running
-                ? '监控运行中'
-                : '监控已暂停',
-
-            state.running
-                ? 'running'
-                : 'paused'
-        );
     }
 
 
     /************************************************************
-     * 26. 拖动控制面板
-     ************************************************************/
-
-    function makePanelDraggable(panel) {
-
-        const header =
-            panel.querySelector(
-                '.tm-header'
-            );
-
-
-        let dragging = false;
-
-        let offsetX = 0;
-
-        let offsetY = 0;
-
-
-        header.addEventListener(
-            'mousedown',
-            function (e) {
-
-                if (
-                    e.target.closest(
-                        '.tm-close'
-                    )
-                ) {
-                    return;
-                }
-
-
-                dragging = true;
-
-
-                const rect =
-                    panel.getBoundingClientRect();
-
-
-                offsetX =
-                    e.clientX -
-                    rect.left;
-
-                offsetY =
-                    e.clientY -
-                    rect.top;
-
-
-                document.body.style.userSelect =
-                    'none';
-            }
-        );
-
-
-        document.addEventListener(
-            'mousemove',
-            function (e) {
-
-                if (!dragging) {
-                    return;
-                }
-
-
-                let left =
-                    e.clientX -
-                    offsetX;
-
-                let top =
-                    e.clientY -
-                    offsetY;
-
-
-                left =
-                    Math.max(
-                        0,
-                        Math.min(
-                            window.innerWidth -
-                            panel.offsetWidth,
-                            left
-                        )
-                    );
-
-
-                top =
-                    Math.max(
-                        0,
-                        Math.min(
-                            window.innerHeight -
-                            panel.offsetHeight,
-                            top
-                        )
-                    );
-
-
-                panel.style.left =
-                    left + 'px';
-
-                panel.style.top =
-                    top + 'px';
-
-
-                config.panelLeft =
-                    left;
-
-                config.panelTop =
-                    top;
-
-                saveConfig();
-            }
-        );
-
-
-        document.addEventListener(
-            'mouseup',
-            function () {
-
-                dragging = false;
-
-                document.body.style.userSelect =
-                    '';
-            }
-        );
-    }
-
-
-    /************************************************************
-     * 27. Tampermonkey 菜单
-     ************************************************************/
-
-    GM_registerMenuCommand(
-        '显示 / 隐藏 今仓监控面板',
-        function () {
-
-            const panel =
-                document.getElementById(
-                    'trade-monitor-panel'
-                );
-
-            if (!panel) {
-                return;
-            }
-
-            panel.style.display =
-                panel.style.display === 'none'
-                    ? 'block'
-                    : 'none';
-        }
-    );
-
-
-    GM_registerMenuCommand(
-        '立即检查今仓',
-        function () {
-
-            checkTodayPosition(true);
-        }
-    );
-
-
-    GM_registerMenuCommand(
-        '重新建立今仓基准',
-        function () {
-
-            resetBaseline();
-        }
-    );
-
-
-    /************************************************************
-     * 28. 初始化
+     * 24. 页面初始化
      ************************************************************/
 
     function init() {
 
-        loadMonitorState();
+        /*
+         * 非交易记录页面：
+         *
+         * 直接退出。
+         *
+         * 不创建弹窗。
+         */
+
+        if (!isTargetPage()) {
+
+            console.log(
+                '[今仓监控] 非目标页面，不显示控制面板'
+            );
+
+            return;
+        }
+
+
+        console.log(
+            '[今仓监控] 目标交易页面'
+        );
+
+
+        injectStyle();
 
         createPanel();
 
-        startMutationObserver();
+        setupMutationObserver();
 
 
         /*
-         * 等待页面数据加载
-         *
-         * 很多交易页面不是一开始就有数据，
-         * 所以连续尝试几次。
+         * 如果之前已经开启监控，
+         * 刷新页面后自动恢复。
          */
 
-        let retry = 0;
+        if (config.enabled) {
+
+            setTimeout(
+                () => {
+
+                    startMonitor();
+
+                },
+                1000
+            );
+        }
+    }
 
 
-        const waitTimer =
+    /************************************************************
+     * 25. 防止页面动态加载
+     ************************************************************/
+
+    function waitForTargetPage() {
+
+        if (isTargetPage()) {
+
+            init();
+
+            return;
+        }
+
+
+        /*
+         * 有些页面是 SPA / AJAX，
+         * 初始加载时 #products 还没有出现。
+         */
+
+        let count = 0;
+
+
+        const timer =
             setInterval(
                 () => {
 
-                    retry++;
+                    count++;
+
 
                     if (
-                        document.querySelector(
-                            '#products'
-                        )
+                        isTargetPage()
                     ) {
 
                         clearInterval(
-                            waitTimer
+                            timer
                         );
 
-                        startMonitoring();
+                        init();
 
-                    } else if (
-                        retry >= 20
-                    ) {
+                        return;
+                    }
+
+
+                    if (count > 30) {
 
                         clearInterval(
-                            waitTimer
+                            timer
                         );
-
-                        /*
-                         * 即使暂时没找到，
-                         * 仍然启动监控。
-                         *
-                         * 后续 AJAX 数据出现后
-                         * MutationObserver 会触发检查。
-                         */
-
-                        startMonitoring();
                     }
 
                 },
-                500
+                1000
             );
     }
 
 
-    /*
-     * DOM ready
-     */
+    waitForTargetPage();
 
-    if (
-        document.readyState ===
-        'loading'
-    ) {
-
-        document.addEventListener(
-            'DOMContentLoaded',
-            init
-        );
-
-    } else {
-
-        init();
-    }
 
 })();
