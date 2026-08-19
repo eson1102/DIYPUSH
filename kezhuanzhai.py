@@ -6,7 +6,7 @@ import os
 from datetime import datetime, timedelta
 
 # ==================== 配置区 ====================
-WEBHOOK_URL = os.environ.get('WEBHOOK_URL', '')
+WEBHOOK_URL = os.environ.get('WECOM_WEBHOOK', '')
 
 # ==================== 核心函数 ====================
 
