@@ -1,4 +1,4 @@
-name: 每日自动签到
+name: Mindvideo每日自动签到
 
 on:
   schedule:
