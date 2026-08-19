@@ -31,7 +31,7 @@ jobs:
       
       - name: 运行可转债申购提醒
         env:
-          WEBHOOK_URL: ${{ secrets.WEBHOOK_URL }}
+          WEBHOOK_URL: ${{ secrets.WECOM_WEBHOOK }}
         run: |
           python kezhuanzhai.py
       
