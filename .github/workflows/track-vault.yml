@@ -1,0 +1,37 @@
+name: Track Plume Vault Net Value
+
+on:
+  schedule:
+    # 每天UTC 00:00, 06:00, 12:00, 18:00 运行
+    - cron: '0 0,6,12,18 * * *'
+  workflow_dispatch:  # 允许手动触发
+
+jobs:
+  track-vault:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+          
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+          
+      - name: Fetch vault data
+        run: |
+          python scripts/fetch_vault_data.py
+          
+      - name: Commit and push if changed
+        run: |
+          git config user.name "GitHub Action"
+          git config user.email "action@github.com"
+          git add data/
+          git diff --staged --quiet || git commit -m "Update vault data [skip ci]"
+          git push
