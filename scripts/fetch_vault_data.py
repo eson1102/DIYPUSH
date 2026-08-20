@@ -67,15 +67,14 @@ class PlumeVaultTracker:
                 'date': datetime.utcnow().strftime('%Y-%m-%d')
             }
             
-            # 方法1: 通过CSS类查找价格
-            price_elements = soup.find_all(class_=re.compile(r'css-1cz2y6m'))
-            for el in price_elements:
-                text = el.get_text(strip=True)
+            # 方法1: 通过CSS类查找价格 - 使用更精确的选择器
+            price_element = soup.find('p', class_=re.compile(r'css-1cz2y6m'))
+            if price_element:
+                text = price_element.get_text(strip=True)
                 price = self._extract_price(text)
                 if price:
                     data['price'] = price
                     logger.info(f"找到价格: ${price}")
-                    break
             
             # 方法2: 查找包含$符号的文本
             if not data['price']:
@@ -86,10 +85,10 @@ class PlumeVaultTracker:
                     data['price'] = float(matches[0])
                     logger.info(f"通过正则找到价格: ${data['price']}")
             
-            # 提取价格变化和APY - 修复正则表达式
-            change_elements = soup.find_all(class_=re.compile(r'css-lbly53'))
-            for el in change_elements:
-                text = el.get_text(strip=True)
+            # 提取价格变化和APY - 使用更精确的选择器
+            change_element = soup.find('span', class_=re.compile(r'css-lbly53'))
+            if change_element:
+                text = change_element.get_text(strip=True)
                 logger.info(f"变化文本: {text}")
                 
                 # 提取价格变化: +$0.056329
@@ -99,12 +98,12 @@ class PlumeVaultTracker:
                     value = float(change_match.group(2))
                     data['price_change'] = value if sign == '+' else -value
                 
-                # 提取涨跌幅: (5.46%) 或 (+5.46%)
+                # 提取涨跌幅: 从文本中提取百分比
                 percent_match = re.search(r'\(([\d.]+)%', text)
                 if percent_match:
                     data['price_change_percent'] = float(percent_match.group(1))
                 
-                # 提取APY: 11.38% APY
+                # 提取APY: 从文本中提取APY
                 apy_match = re.search(r'([\d.]+)%\s*APY', text)
                 if apy_match:
                     data['apy'] = float(apy_match.group(1))
@@ -114,26 +113,18 @@ class PlumeVaultTracker:
                     apy_match2 = re.search(r'([\d.]+)%APY', text)
                     if apy_match2:
                         data['apy'] = float(apy_match2.group(1))
-                
-                break
             
-            # 如果数据不完整，尝试在script标签中查找
-            if not data['price'] or not data['apy']:
-                scripts = soup.find_all('script')
-                for script in scripts:
-                    if script.string:
-                        text = script.string
-                        # 查找价格
-                        if not data['price']:
-                            price_match = re.search(r'"price"\s*:\s*"?([\d.]+)"?', text)
-                            if price_match:
-                                data['price'] = float(price_match.group(1))
-                        
-                        # 查找APY
-                        if not data['apy']:
-                            apy_match = re.search(r'"apy"\s*:\s*"?([\d.]+)"?', text)
-                            if apy_match:
-                                data['apy'] = float(apy_match.group(1))
+            # 方法3: 从Vault APY区域获取数据
+            if not data['apy']:
+                apy_elements = soup.find_all('span', class_=re.compile(r'css-hukq4b'))
+                for el in apy_elements:
+                    text = el.get_text(strip=True)
+                    if '%' in text:
+                        apy_match = re.search(r'([\d.]+)%', text)
+                        if apy_match:
+                            data['apy'] = float(apy_match.group(1))
+                            logger.info(f"从Vault APY找到APY: {data['apy']}%")
+                            break
             
             # 检查是否获取到有效数据
             if data['price'] is None:
@@ -167,7 +158,6 @@ class PlumeVaultTracker:
             return False
         
         try:
-            # 保存今天的数据
             with open(self.today_file, 'w') as f:
                 json.dump(data, f, indent=2)
             logger.info(f"已保存今天的数据到 {self.today_file}")
@@ -200,7 +190,6 @@ class PlumeVaultTracker:
         """更新历史数据"""
         history = self.load_history()
         
-        # 检查今天是否已有记录
         today_date = data['date']
         existing_index = None
         for i, record in enumerate(history):
@@ -209,24 +198,19 @@ class PlumeVaultTracker:
                 break
         
         if existing_index is not None:
-            # 更新今天的记录
             history[existing_index] = data
             logger.info(f"更新了 {today_date} 的记录")
         else:
-            # 添加新记录
             history.append(data)
             logger.info(f"添加了 {today_date} 的新记录")
         
-        # 按日期排序
         history.sort(key=lambda x: x.get('date', ''))
-        
         self.save_history(history)
     
     def get_previous_day_data(self, current_date: str) -> Optional[Dict]:
         """获取前一天的数据"""
         history = self.load_history()
         
-        # 计算前一天的日期
         current_dt = datetime.strptime(current_date, '%Y-%m-%d')
         previous_dt = current_dt - timedelta(days=1)
         previous_date = previous_dt.strftime('%Y-%m-%d')
@@ -256,8 +240,8 @@ class PlumeVaultTracker:
         }
         
         if yesterday_data:
-            today_price = today_data.get('price', 0)
-            yesterday_price = yesterday_data.get('price', 0)
+            today_price = today_data.get('price', 0) or 0
+            yesterday_price = yesterday_data.get('price', 0) or 0
             
             if yesterday_price > 0:
                 price_diff = today_price - yesterday_price
@@ -266,8 +250,8 @@ class PlumeVaultTracker:
                     (price_diff / yesterday_price) * 100, 2
                 )
             
-            today_apy = today_data.get('apy', 0)
-            yesterday_apy = yesterday_data.get('apy', 0)
+            today_apy = today_data.get('apy', 0) or 0
+            yesterday_apy = yesterday_data.get('apy', 0) or 0
             if yesterday_apy > 0:
                 comparison['comparison']['apy_change'] = round(today_apy - yesterday_apy, 2)
                 comparison['comparison']['apy_change_percent'] = round(
@@ -280,26 +264,24 @@ class PlumeVaultTracker:
             'timestamp': datetime.utcnow().isoformat(),
             'comparison': comparison['comparison'],
             'today': {
-                'price': today_data.get('price'),
-                'apy': today_data.get('apy'),
-                'price_change': today_data.get('price_change'),
-                'price_change_percent': today_data.get('price_change_percent')
+                'price': today_data.get('price', 0),
+                'apy': today_data.get('apy', 0),
+                'price_change': today_data.get('price_change', 0),
+                'price_change_percent': today_data.get('price_change_percent', 0)
             },
             'yesterday': {
-                'price': yesterday_data.get('price') if yesterday_data else None,
-                'apy': yesterday_data.get('apy') if yesterday_data else None
+                'price': yesterday_data.get('price', 0) if yesterday_data else None,
+                'apy': yesterday_data.get('apy', 0) if yesterday_data else None
             }
         }
         
         # 保存每日摘要
         try:
-            # 加载现有摘要
             daily_summaries = []
             if os.path.exists(self.daily_summary_file):
                 with open(self.daily_summary_file, 'r') as f:
                     daily_summaries = json.load(f)
             
-            # 更新或添加
             existing_index = None
             for i, s in enumerate(daily_summaries):
                 if s.get('date') == today_data['date']:
@@ -350,7 +332,6 @@ class PlumeVaultTracker:
         
         print("\n" + "="*60)
         
-        # 保存到markdown文件
         self.save_markdown_report(comparison)
     
     def save_markdown_report(self, comparison: Dict):
@@ -360,14 +341,33 @@ class PlumeVaultTracker:
         comp = comparison.get('comparison', {})
         date = today.get('date', 'unknown')
         
-        # 安全获取yesterday数据
-        yesterday_price = yesterday.get('price', 0) if yesterday else 0
-        yesterday_apy = yesterday.get('apy', 0) if yesterday else 0
+        # 安全获取数据，确保所有值都是数字
+        today_price = today.get('price', 0)
+        if today_price is None:
+            today_price = 0
+        today_apy = today.get('apy', 0)
+        if today_apy is None:
+            today_apy = 0
         
-        # 格式化变化值
+        yesterday_price = 0
+        yesterday_apy = 0
+        if yesterday:
+            yesterday_price = yesterday.get('price', 0)
+            if yesterday_price is None:
+                yesterday_price = 0
+            yesterday_apy = yesterday.get('apy', 0)
+            if yesterday_apy is None:
+                yesterday_apy = 0
+        
         price_change = comp.get('price_change_24h', 0)
+        if price_change is None:
+            price_change = 0
         price_change_percent = comp.get('price_change_percent_24h', 0)
+        if price_change_percent is None:
+            price_change_percent = 0
         apy_change = comp.get('apy_change', 0)
+        if apy_change is None:
+            apy_change = 0
         
         lines = [
             f"# Plume Vault 净值报告 - {date}",
@@ -376,8 +376,8 @@ class PlumeVaultTracker:
             "",
             "| 指标 | 今日 | 昨日 | 变化 |",
             "|------|------|------|------|",
-            f"| 净值 | ${today.get('price', 0):.4f} | ${yesterday_price:.4f} | ${price_change:+.6f} ({price_change_percent:+.2f}%) |",
-            f"| APY | {today.get('apy', 0):.2f}% | {yesterday_apy:.2f}% | {apy_change:+.2f}% |",
+            f"| 净值 | ${today_price:.4f} | ${yesterday_price:.4f} | ${price_change:+.6f} ({price_change_percent:+.2f}%) |",
+            f"| APY | {today_apy:.2f}% | {yesterday_apy:.2f}% | {apy_change:+.2f}% |",
             "",
             f"📅 更新时间: {datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S UTC')}",
             "",
@@ -397,7 +397,6 @@ def main():
     """主函数"""
     tracker = PlumeVaultTracker()
     
-    # 获取数据
     logger.info("开始获取Plume Vault数据...")
     data = tracker.fetch_data()
     
@@ -405,16 +404,10 @@ def main():
         logger.error("获取数据失败")
         exit(1)
     
-    # 保存今天的数据
     tracker.save_today_data(data)
-    
-    # 更新历史记录
     tracker.update_history(data)
-    
-    # 生成对比
     comparison = tracker.generate_comparison(data)
     
-    # 打印对比
     if comparison:
         tracker.print_comparison(comparison)
     else:
