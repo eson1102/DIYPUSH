@@ -28,23 +28,8 @@ jobs:
           pip install -r requirements.txt
           
       - name: Fetch vault data
-        id: fetch_data
         run: |
           python scripts/fetch_vault_data.py
-          
-          if [ -f data/today.json ]; then
-            PRICE=$(jq -r '.price' data/today.json)
-            APY=$(jq -r '.apy' data/today.json)
-            PRICE_CHANGE=$(jq -r '.price_change' data/today.json)
-            PRICE_CHANGE_PERCENT=$(jq -r '.price_change_percent' data/today.json)
-            DATE=$(jq -r '.date' data/today.json)
-            
-            echo "CURRENT_PRICE=$PRICE" >> $GITHUB_ENV
-            echo "CURRENT_APY=$APY" >> $GITHUB_ENV
-            echo "PRICE_CHANGE=$PRICE_CHANGE" >> $GITHUB_ENV
-            echo "PRICE_CHANGE_PERCENT=$PRICE_CHANGE_PERCENT" >> $GITHUB_ENV
-            echo "UPDATE_DATE=$DATE" >> $GITHUB_ENV
-          fi
           
       - name: Commit and push if changed
         run: |
@@ -59,6 +44,7 @@ jobs:
         run: |
           WEBHOOK_URL="https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=${{ secrets.WECOM_WEBHOOK }}"
           
+          # 构建消息内容
           if [ -f data/today.json ]; then
             PRICE=$(jq -r '.price' data/today.json)
             APY=$(jq -r '.apy' data/today.json)
@@ -66,7 +52,6 @@ jobs:
             PRICE_CHANGE_PERCENT=$(jq -r '.price_change_percent' data/today.json)
             DATE=$(jq -r '.date' data/today.json)
             
-            # 判断涨跌趋势
             if (( $(echo "$PRICE_CHANGE_PERCENT > 0" | bc -l) )); then
               TREND="上涨 📈"
             elif (( $(echo "$PRICE_CHANGE_PERCENT == 0" | bc -l) )); then
@@ -75,39 +60,13 @@ jobs:
               TREND="下跌 📉"
             fi
             
-            # 构建纯文本消息
-            MESSAGE="【Plume Vault 净值更新】
-            
-更新日期: $DATE
-
-当前净值: $${PRICE}
-当前 APY: ${APY}%
-
-价格变化: ${TREND}
-  变化金额: +$${PRICE_CHANGE}
-  涨跌幅: ${PRICE_CHANGE_PERCENT}%
-
-更新时间: $(date '+%Y-%m-%d %H:%M:%S UTC')
-查看详情: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+            # 使用 echo 构建多行消息
+            MESSAGE=$(echo -e "【Plume Vault 净值更新】\n\n更新日期: $DATE\n\n当前净值: $${PRICE}\n当前 APY: ${APY}%\n\n价格变化: ${TREND}\n  变化金额: +$${PRICE_CHANGE}\n  涨跌幅: ${PRICE_CHANGE_PERCENT}%\n\n更新时间: $(date '+%Y-%m-%d %H:%M:%S UTC')\n查看详情: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}")
           else
-            MESSAGE="【Plume Vault 数据获取失败】
-            
-未能获取到 Vault 数据，请检查脚本运行情况。
-查看详情: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+            MESSAGE=$(echo -e "【Plume Vault 数据获取失败】\n\n未能获取到 Vault 数据，请检查脚本运行情况。\n查看详情: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}")
           fi
           
-          # 使用纯文本格式发送
-          PAYLOAD=$(jq -n \
-            --arg msg "$MESSAGE" \
-            '{
-              msgtype: "text",
-              text: {
-                content: $msg
-              }
-            }')
-          
+          # 发送到企业微信
           curl -X POST "$WEBHOOK_URL" \
             -H "Content-Type: application/json" \
-            -d "$PAYLOAD"
-          
-          echo "✅ 企业微信纯文本通知已发送"
+            -d "{\"msgtype\":\"text\",\"text\":{\"content\":\"$MESSAGE\"}}"
