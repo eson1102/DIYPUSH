@@ -86,18 +86,20 @@ class PlumeVaultTracker:
                     data['price'] = float(matches[0])
                     logger.info(f"通过正则找到价格: ${data['price']}")
             
-            # 提取价格变化和APY
+            # 提取价格变化和APY - 修复正则表达式
             change_elements = soup.find_all(class_=re.compile(r'css-lbly53'))
             for el in change_elements:
                 text = el.get_text(strip=True)
                 logger.info(f"变化文本: {text}")
                 
                 # 提取价格变化: +$0.056329
-                change_match = re.search(r'[\+\-]\$([\d.]+)', text)
+                change_match = re.search(r'([\+\-])\$([\d.]+)', text)
                 if change_match:
-                    data['price_change'] = float(change_match.group(1))
+                    sign = change_match.group(1)
+                    value = float(change_match.group(2))
+                    data['price_change'] = value if sign == '+' else -value
                 
-                # 提取涨跌幅: (5.46%)
+                # 提取涨跌幅: (5.46%) 或 (+5.46%)
                 percent_match = re.search(r'\(([\d.]+)%', text)
                 if percent_match:
                     data['price_change_percent'] = float(percent_match.group(1))
@@ -106,6 +108,12 @@ class PlumeVaultTracker:
                 apy_match = re.search(r'([\d.]+)%\s*APY', text)
                 if apy_match:
                     data['apy'] = float(apy_match.group(1))
+                
+                # 如果上面的没匹配到，尝试其他格式
+                if not data['apy']:
+                    apy_match2 = re.search(r'([\d.]+)%APY', text)
+                    if apy_match2:
+                        data['apy'] = float(apy_match2.group(1))
                 
                 break
             
@@ -117,13 +125,13 @@ class PlumeVaultTracker:
                         text = script.string
                         # 查找价格
                         if not data['price']:
-                            price_match = re.search(r'"price"?\s*:\s*"?([\d.]+)"?', text)
+                            price_match = re.search(r'"price"\s*:\s*"?([\d.]+)"?', text)
                             if price_match:
                                 data['price'] = float(price_match.group(1))
                         
                         # 查找APY
                         if not data['apy']:
-                            apy_match = re.search(r'"apy"?\s*:\s*"?([\d.]+)"?', text)
+                            apy_match = re.search(r'"apy"\s*:\s*"?([\d.]+)"?', text)
                             if apy_match:
                                 data['apy'] = float(apy_match.group(1))
             
@@ -215,7 +223,7 @@ class PlumeVaultTracker:
         self.save_history(history)
     
     def get_previous_day_data(self, current_date: str) -> Optional[Dict]:
-        """获取前一天的數據"""
+        """获取前一天的数据"""
         history = self.load_history()
         
         # 计算前一天的日期
@@ -273,7 +281,9 @@ class PlumeVaultTracker:
             'comparison': comparison['comparison'],
             'today': {
                 'price': today_data.get('price'),
-                'apy': today_data.get('apy')
+                'apy': today_data.get('apy'),
+                'price_change': today_data.get('price_change'),
+                'price_change_percent': today_data.get('price_change_percent')
             },
             'yesterday': {
                 'price': yesterday_data.get('price') if yesterday_data else None,
@@ -330,6 +340,8 @@ class PlumeVaultTracker:
             print(f"📉 昨日净值: ${yesterday.get('price', 0):.4f}")
             print(f"📈 24小时变化: ${comp.get('price_change_24h', 0):+.6f}")
             print(f"📊 24小时涨跌幅: {comp.get('price_change_percent_24h', 0):+.2f}%")
+        else:
+            print("📉 昨日数据: 暂无")
         
         print(f"\n🏦 当前 APY: {today.get('apy', 0):.2f}%")
         if yesterday and yesterday.get('apy'):
@@ -348,6 +360,15 @@ class PlumeVaultTracker:
         comp = comparison.get('comparison', {})
         date = today.get('date', 'unknown')
         
+        # 安全获取yesterday数据
+        yesterday_price = yesterday.get('price', 0) if yesterday else 0
+        yesterday_apy = yesterday.get('apy', 0) if yesterday else 0
+        
+        # 格式化变化值
+        price_change = comp.get('price_change_24h', 0)
+        price_change_percent = comp.get('price_change_percent_24h', 0)
+        apy_change = comp.get('apy_change', 0)
+        
         lines = [
             f"# Plume Vault 净值报告 - {date}",
             "",
@@ -355,8 +376,8 @@ class PlumeVaultTracker:
             "",
             "| 指标 | 今日 | 昨日 | 变化 |",
             "|------|------|------|------|",
-            f"| 净值 | ${today.get('price', 0):.4f} | ${yesterday.get('price', 0):.4f if yesterday else 'N/A'} | ${comp.get('price_change_24h', 0):+.6f} ({comp.get('price_change_percent_24h', 0):+.2f}%) |",
-            f"| APY | {today.get('apy', 0):.2f}% | {yesterday.get('apy', 0):.2f}% if yesterday and yesterday.get('apy') else 'N/A' | {comp.get('apy_change', 0):+.2f}% |",
+            f"| 净值 | ${today.get('price', 0):.4f} | ${yesterday_price:.4f} | ${price_change:+.6f} ({price_change_percent:+.2f}%) |",
+            f"| APY | {today.get('apy', 0):.2f}% | {yesterday_apy:.2f}% | {apy_change:+.2f}% |",
             "",
             f"📅 更新时间: {datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S UTC')}",
             "",
@@ -366,7 +387,7 @@ class PlumeVaultTracker:
         
         markdown_file = os.path.join(self.data_dir, f"report_{date}.md")
         try:
-            with open(markdown_file, 'w') as f:
+            with open(markdown_file, 'w', encoding='utf-8') as f:
                 f.write('\n'.join(lines))
             logger.info(f"已保存Markdown报告: {markdown_file}")
         except Exception as e:
@@ -394,7 +415,10 @@ def main():
     comparison = tracker.generate_comparison(data)
     
     # 打印对比
-    tracker.print_comparison(comparison)
+    if comparison:
+        tracker.print_comparison(comparison)
+    else:
+        logger.warning("无法生成对比数据")
     
     logger.info("数据获取完成！")
 
