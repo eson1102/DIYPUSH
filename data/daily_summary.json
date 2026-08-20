@@ -1,0 +1,22 @@
+[
+  {
+    "date": "2026-08-20",
+    "timestamp": "2026-08-20T06:37:30.327987",
+    "comparison": {
+      "price_change_24h": null,
+      "price_change_percent_24h": null,
+      "apy_change": null,
+      "apy_change_percent": null
+    },
+    "today": {
+      "price": 1.0882,
+      "apy": 11.38,
+      "price_change": 0.056329,
+      "price_change_percent": null
+    },
+    "yesterday": {
+      "price": null,
+      "apy": null
+    }
+  }
+]
