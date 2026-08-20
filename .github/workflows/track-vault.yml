@@ -42,7 +42,7 @@ jobs:
       - name: Send WeCom notification
         if: always()
         run: |
-          WEBHOOK_URL="https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=${{ secrets.WECOM_WEBHOOK }}"
+          WEBHOOK_URL="https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=e75ac7b2-f7e7-45a5-a7b8-0f92390ab020"
           
           # 构建消息内容
           if [ -f data/today.json ]; then
