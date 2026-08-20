@@ -9,13 +9,13 @@ jobs:
   track-vault:
     runs-on: ubuntu-latest
     permissions:
-      contents: write  # 添加写入权限
+      contents: write
     
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          token: ${{ secrets.GITHUB_TOKEN }}  # 使用 GITHUB_TOKEN
+          token: ${{ secrets.GITHUB_TOKEN }}
         
       - name: Setup Python
         uses: actions/setup-python@v5
@@ -28,8 +28,23 @@ jobs:
           pip install -r requirements.txt
           
       - name: Fetch vault data
+        id: fetch_data
         run: |
           python scripts/fetch_vault_data.py
+          
+          if [ -f data/today.json ]; then
+            PRICE=$(jq -r '.price' data/today.json)
+            APY=$(jq -r '.apy' data/today.json)
+            PRICE_CHANGE=$(jq -r '.price_change' data/today.json)
+            PRICE_CHANGE_PERCENT=$(jq -r '.price_change_percent' data/today.json)
+            DATE=$(jq -r '.date' data/today.json)
+            
+            echo "CURRENT_PRICE=$PRICE" >> $GITHUB_ENV
+            echo "CURRENT_APY=$APY" >> $GITHUB_ENV
+            echo "PRICE_CHANGE=$PRICE_CHANGE" >> $GITHUB_ENV
+            echo "PRICE_CHANGE_PERCENT=$PRICE_CHANGE_PERCENT" >> $GITHUB_ENV
+            echo "UPDATE_DATE=$DATE" >> $GITHUB_ENV
+          fi
           
       - name: Commit and push if changed
         run: |
@@ -38,3 +53,61 @@ jobs:
           git add data/
           git diff --staged --quiet || git commit -m "Update vault data [skip ci]"
           git push
+          
+      - name: Send WeCom notification
+        if: always()
+        run: |
+          WEBHOOK_URL="https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=${{ secrets.WECOM_WEBHOOK }}"
+          
+          if [ -f data/today.json ]; then
+            PRICE=$(jq -r '.price' data/today.json)
+            APY=$(jq -r '.apy' data/today.json)
+            PRICE_CHANGE=$(jq -r '.price_change' data/today.json)
+            PRICE_CHANGE_PERCENT=$(jq -r '.price_change_percent' data/today.json)
+            DATE=$(jq -r '.date' data/today.json)
+            
+            # 判断涨跌趋势
+            if (( $(echo "$PRICE_CHANGE_PERCENT > 0" | bc -l) )); then
+              TREND="上涨 📈"
+            elif (( $(echo "$PRICE_CHANGE_PERCENT == 0" | bc -l) )); then
+              TREND="持平 ➡️"
+            else
+              TREND="下跌 📉"
+            fi
+            
+            # 构建纯文本消息
+            MESSAGE="【Plume Vault 净值更新】
+            
+更新日期: $DATE
+
+当前净值: $${PRICE}
+当前 APY: ${APY}%
+
+价格变化: ${TREND}
+  变化金额: +$${PRICE_CHANGE}
+  涨跌幅: ${PRICE_CHANGE_PERCENT}%
+
+更新时间: $(date '+%Y-%m-%d %H:%M:%S UTC')
+查看详情: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          else
+            MESSAGE="【Plume Vault 数据获取失败】
+            
+未能获取到 Vault 数据，请检查脚本运行情况。
+查看详情: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          fi
+          
+          # 使用纯文本格式发送
+          PAYLOAD=$(jq -n \
+            --arg msg "$MESSAGE" \
+            '{
+              msgtype: "text",
+              text: {
+                content: $msg
+              }
+            }')
+          
+          curl -X POST "$WEBHOOK_URL" \
+            -H "Content-Type: application/json" \
+            -d "$PAYLOAD"
+          
+          echo "✅ 企业微信纯文本通知已发送"
