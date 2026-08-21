@@ -18,5 +18,25 @@
       "price": null,
       "apy": null
     }
+  },
+  {
+    "date": "2026-08-21",
+    "timestamp": "2026-08-21T01:41:39.276427",
+    "comparison": {
+      "price_change_24h": 0.0,
+      "price_change_percent_24h": 0.0,
+      "apy_change": 0.0,
+      "apy_change_percent": 0.0
+    },
+    "today": {
+      "price": 1.0885,
+      "apy": 11.44,
+      "price_change": 0.056639,
+      "price_change_percent": null
+    },
+    "yesterday": {
+      "price": 1.0885,
+      "apy": 11.44
+    }
   }
 ]
