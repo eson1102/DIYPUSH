@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-LayerCraft 自动签到脚本 - 最终版
+LayerCraft 自动签到脚本 - 最终修复版
 通过模拟页面加载触发签到
 """
 
@@ -8,8 +8,9 @@ import requests
 import json
 import logging
 import os
+import time
 from datetime import datetime, timezone, timedelta
-from typing import Dict, Optional
+from typing import Dict, Optional, List, Any
 
 # 设置调试模式
 DEBUG = os.getenv('DEBUG', 'false').lower() == 'true'
@@ -54,6 +55,10 @@ class WeComNotifier:
                 if result.get('errcode') == 0:
                     logger.info("✅ 企业微信消息推送成功")
                     return True
+                else:
+                    logger.error(f"❌ 企业微信推送失败: {result}")
+            else:
+                logger.error(f"❌ 企业微信推送请求失败: {response.status_code}")
             return False
                 
         except Exception as e:
@@ -62,7 +67,7 @@ class WeComNotifier:
 
 
 class LayerCraftCheckin:
-    """LayerCraft 签到客户端 - 最终版"""
+    """LayerCraft 签到客户端 - 最终修复版"""
     
     BASE_URL = "https://layercraft.com.cn/api"
     APP_URL = "https://layercraft.com.cn/app.html"
@@ -112,10 +117,15 @@ class LayerCraftCheckin:
                 return True
             else:
                 logger.error(f"❌ 登录失败: {response.status_code}")
+                if DEBUG:
+                    logger.debug(f"登录失败响应: {response.text}")
                 return False
                 
         except Exception as e:
             logger.error(f"❌ 登录异常: {e}")
+            if DEBUG:
+                import traceback
+                logger.debug(traceback.format_exc())
             return False
     
     def load_app_page(self) -> bool:
@@ -141,30 +151,78 @@ class LayerCraftCheckin:
             logger.error(f"❌ 加载页面异常: {e}")
             return False
     
-    def get_point_transactions(self, limit: int = 5) -> list:
+    def get_point_transactions(self, limit: int = 5) -> List[Dict[str, Any]]:
         """获取最近的积分交易记录"""
         try:
             url = f"{self.BASE_URL}/account/point-transactions?limit={limit}"
             response = self.session.get(url, timeout=30)
             
+            if DEBUG:
+                logger.debug(f"积分记录响应状态码: {response.status_code}")
+                logger.debug(f"积分记录响应内容前200字符: {response.text[:200]}")
+            
             if response.status_code == 200:
                 data = response.json()
-                if DEBUG:
-                    logger.debug(f"获取到 {len(data)} 条积分记录")
-                return data
+                
+                # 处理不同的数据格式
+                if isinstance(data, list):
+                    if DEBUG:
+                        logger.debug(f"获取到 {len(data)} 条积分记录 (列表格式)")
+                    return data
+                elif isinstance(data, dict):
+                    # 有些 API 返回 {data: [...]} 格式
+                    if 'data' in data and isinstance(data['data'], list):
+                        if DEBUG:
+                            logger.debug(f"获取到 {len(data['data'])} 条积分记录 (data字段)")
+                        return data['data']
+                    elif 'items' in data and isinstance(data['items'], list):
+                        if DEBUG:
+                            logger.debug(f"获取到 {len(data['items'])} 条积分记录 (items字段)")
+                        return data['items']
+                    else:
+                        # 可能是单个对象
+                        if DEBUG:
+                            logger.debug(f"返回的是字典格式，尝试作为列表处理")
+                        return [data] if data else []
+                else:
+                    logger.warning(f"⚠️ 未知的数据格式: {type(data)}")
+                    return []
+            else:
+                logger.warning(f"⚠️ 获取积分记录失败: {response.status_code}")
+                return []
+                
+        except json.JSONDecodeError as e:
+            logger.error(f"❌ JSON 解析失败: {e}")
+            if DEBUG:
+                logger.debug(f"原始响应: {response.text[:500]}")
             return []
         except Exception as e:
             logger.error(f"❌ 获取积分记录异常: {e}")
+            if DEBUG:
+                import traceback
+                logger.debug(traceback.format_exc())
             return []
     
-    def check_today_checkin(self, transactions: list) -> Dict:
+    def check_today_checkin(self, transactions: List[Dict[str, Any]]) -> Dict[str, Any]:
         """检查今天是否已签到"""
         today = datetime.now(BEIJING_TZ).strftime('%Y-%m-%d')
         
+        if DEBUG:
+            logger.debug(f"检查今日签到: {today}")
+            logger.debug(f"交易记录数: {len(transactions)}")
+        
         for tx in transactions:
-            if tx.get('reason') == 'daily_login_bonus':
+            if not isinstance(tx, dict):
+                if DEBUG:
+                    logger.debug(f"跳过非字典项: {tx}")
+                continue
+                
+            reason = tx.get('reason', '')
+            if reason == 'daily_login_bonus':
                 ref_id = tx.get('reference_id', '')
                 if ref_id == today:
+                    if DEBUG:
+                        logger.debug(f"找到今日签到记录: {json.dumps(tx, ensure_ascii=False)}")
                     return {
                         'checked': True,
                         'points': tx.get('balance_after', 0),
@@ -172,18 +230,24 @@ class LayerCraftCheckin:
                         'time': tx.get('created_at', '')
                     }
         
+        if DEBUG:
+            logger.debug("未找到今日签到记录")
         return {'checked': False}
     
-    def daily_checkin(self) -> Dict:
+    def daily_checkin(self) -> Dict[str, Any]:
         """执行每日签到"""
         try:
             # 1. 先获取当前积分记录，检查今日是否已签到
             logger.info("检查今日签到状态...")
-            transactions = self.get_point_transactions(5)
+            transactions = self.get_point_transactions(10)
+            
+            if not transactions:
+                logger.warning("⚠️ 未获取到积分记录，可能是接口返回空数据")
+                # 继续尝试签到
             
             check_result = self.check_today_checkin(transactions)
             if check_result.get('checked'):
-                logger.info(f"ℹ️ 今日已签到，获得 {check_result.get('amount', 0)} 积分")
+                logger.info(f"ℹ️ 今日已签到，获得 +{check_result.get('amount', 0)} 积分")
                 logger.info(f"💰 当前积分: {check_result.get('points', 0)}")
                 return {
                     'success': True,
@@ -192,19 +256,45 @@ class LayerCraftCheckin:
                     'message': f"今日已签到 (+{check_result.get('amount', 0)})"
                 }
             
-            # 2. 未签到，加载应用页面触发签到
+            # 2. 未签到，尝试多种方式触发签到
             logger.info("今日未签到，正在触发签到...")
             
-            # 访问应用页面
+            # 方式1: 加载应用页面
             self.load_app_page()
-            
-            # 等待一下，让前端完成签到请求
-            import time
             time.sleep(2)
             
+            # 方式2: 尝试调用签到 API
+            logger.info("尝试调用签到 API...")
+            checkin_apis = [
+                ("POST", "/user/daily-checkin"),
+                ("POST", "/daily-checkin"),
+                ("GET", "/user/daily-checkin"),
+                ("GET", "/daily-checkin"),
+            ]
+            
+            for method, endpoint in checkin_apis:
+                try:
+                    url = f"{self.BASE_URL}{endpoint}"
+                    if method == "POST":
+                        response = self.session.post(url, json={}, timeout=10)
+                    else:
+                        response = self.session.get(url, timeout=10)
+                    
+                    if DEBUG:
+                        logger.debug(f"{method} {endpoint} - 状态码: {response.status_code}")
+                    
+                    if response.status_code == 200:
+                        logger.info(f"✅ API 签到请求成功: {method} {endpoint}")
+                        break
+                except Exception as e:
+                    if DEBUG:
+                        logger.debug(f"{method} {endpoint} 失败: {e}")
+                    continue
+            
             # 3. 重新获取积分记录，确认签到是否成功
+            time.sleep(1)
             logger.info("验证签到结果...")
-            transactions = self.get_point_transactions(5)
+            transactions = self.get_point_transactions(10)
             check_result = self.check_today_checkin(transactions)
             
             if check_result.get('checked'):
@@ -218,41 +308,17 @@ class LayerCraftCheckin:
                     'message': f"签到成功 (+{check_result.get('amount', self.DAILY_POINTS)})"
                 }
             else:
-                # 4. 尝试获取更多记录，可能签到记录在更后面
-                transactions = self.get_point_transactions(10)
-                check_result = self.check_today_checkin(transactions)
-                
-                if check_result.get('checked'):
-                    logger.info(f"✅ 签到成功！获得 +{check_result.get('amount', 0)} 积分")
-                    logger.info(f"💰 当前积分: {check_result.get('points', 0)}")
-                    return {
-                        'success': True,
-                        'already_checked': False,
-                        'points': check_result.get('points', 0),
-                        'daily_points': check_result.get('amount', self.DAILY_POINTS),
-                        'message': f"签到成功 (+{check_result.get('amount', self.DAILY_POINTS)})"
-                    }
-                
-                # 5. 尝试通过前端 API 触发签到
-                logger.info("尝试通过 API 触发签到...")
-                checkin_url = f"{self.BASE_URL}/user/daily-checkin"
-                try:
-                    response = self.session.post(checkin_url, json={}, timeout=30)
-                    if response.status_code == 200:
-                        logger.info("✅ API 签到请求成功")
-                        # 重新获取记录
-                        transactions = self.get_point_transactions(5)
-                        check_result = self.check_today_checkin(transactions)
-                        if check_result.get('checked'):
-                            return {
-                                'success': True,
-                                'already_checked': False,
-                                'points': check_result.get('points', 0),
-                                'daily_points': check_result.get('amount', self.DAILY_POINTS),
-                                'message': f"API 签到成功 (+{check_result.get('amount', self.DAILY_POINTS)})"
-                            }
-                except Exception as e:
-                    logger.debug(f"API 签到尝试失败: {e}")
+                # 如果还是没有签到记录，尝试使用登录返回的数据
+                if self.user_data:
+                    daily_login = self.user_data.get('daily_login', {})
+                    points = daily_login.get('points_balance', 0)
+                    if daily_login.get('granted', 0) == 1:
+                        return {
+                            'success': True,
+                            'already_checked': True,
+                            'points': points,
+                            'message': "通过登录数据确认已签到"
+                        }
                 
                 return {
                     'success': False,
@@ -282,7 +348,7 @@ def main():
     
     if DEBUG:
         logger.debug("=" * 60)
-        logger.debug("启动 LayerCraft 自动签到 (最终版)")
+        logger.debug("启动 LayerCraft 自动签到 (最终修复版)")
         logger.debug(f"LAYERCRAFT_EMAIL={'已设置' if email else '未设置'}")
         logger.debug(f"LAYERCRAFT_PASSWORD={'已设置' if password else '未设置'}")
         logger.debug("=" * 60)
