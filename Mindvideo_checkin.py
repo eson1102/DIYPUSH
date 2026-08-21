@@ -40,35 +40,33 @@ class MindVideoAutoCheckin:
         return hashlib.md5(text.encode('utf-8')).hexdigest()
     
     def send_wecom_message(self, title, content, is_success=True):
-        """发送企业微信机器人消息"""
+        """发送企业微信机器人消息（Text格式）"""
         if not self.webhook_url:
             print("⚠️ 未设置企业微信Webhook，跳过通知")
             return False
         
         try:
-            # 构建Markdown消息
+            # 构建纯文本消息
             if is_success:
-                color = "info"
-                emoji = "✅"
+                status_emoji = "✅"
             else:
-                color = "warning"
-                emoji = "❌"
+                status_emoji = "❌"
             
-            markdown_content = f"""## {emoji} {title}
-
-> **时间**: {self.checkin_result['timestamp']}
-> **状态**: {'成功' if is_success else '失败'}
-
+            # 构建完整的文本内容
+            full_text = f"""【{status_emoji} {title}】
+━━━━━━━━━━━━━━━━━━━━
+📅 时间：{self.checkin_result['timestamp']}
+📧 账号：{self.email}
+📊 状态：{'成功 ✅' if is_success else '失败 ❌'}
 {content}
-
----
-<font color="comment">MindVideo 自动签到系统</font>"""
+━━━━━━━━━━━━━━━━━━━━
+🤖 MindVideo 自动签到系统"""
             
-            # 企业微信机器人消息格式
+            # 企业微信机器人Text消息格式
             message = {
-                "msgtype": "markdown",
-                "markdown": {
-                    "content": markdown_content
+                "msgtype": "text",
+                "text": {
+                    "content": full_text
                 }
             }
             
@@ -141,7 +139,7 @@ class MindVideoAutoCheckin:
                     print(f"✅ 登录成功！")
                     return True
                 else:
-                    error_msg = f"登录响应中未找到Token: {json.dumps(result, ensure_ascii=False)}"
+                    error_msg = f"登录响应中未找到Token"
                     print(f"⚠️ {error_msg}")
                     self.checkin_result["message"] = error_msg
                     return False
@@ -193,11 +191,11 @@ class MindVideoAutoCheckin:
                     # 构建成功消息
                     msg_parts = []
                     if 'points' in data:
-                        msg_parts.append(f"💎 当前积分: {data['points']}")
+                        msg_parts.append(f"💎 当前积分：{data['points']}")
                     if 'continuity' in data:
-                        msg_parts.append(f"📅 连续签到: {data['continuity']}天")
+                        msg_parts.append(f"📅 连续签到：{data['continuity']}天")
                     if 'message' in data:
-                        msg_parts.append(f"📝 消息: {data['message']}")
+                        msg_parts.append(f"📝 消息：{data['message']}")
                     
                     self.checkin_result["message"] = "\n".join(msg_parts) if msg_parts else "签到成功"
                 elif 'message' in result:
@@ -230,24 +228,18 @@ class MindVideoAutoCheckin:
             content = f"""
 {self.checkin_result['message']}
 
-**邮箱**: {self.email}
-**积分**: {self.checkin_result.get('points', 'N/A')}
-**连续签到**: {self.checkin_result.get('continuity', 'N/A')}天
-"""
+💎 积分：{self.checkin_result.get('points', 'N/A')}
+📅 连续签到：{self.checkin_result.get('continuity', 'N/A')}天"""
             return self.send_wecom_message(title, content, is_success=True)
         else:
             title = "MindVideo 签到失败 ⚠️"
             content = f"""
-**错误信息**: {self.checkin_result['message']}
+❌ 错误信息：{self.checkin_result['message']}
 
-**邮箱**: {self.email}
-**时间**: {self.checkin_result['timestamp']}
-
-请检查:
-1. 账号密码是否正确
-2. 网络是否正常
-3. Token是否过期
-"""
+💡 建议检查：
+  • 账号密码是否正确
+  • 网络是否正常
+  • Token是否过期"""
             return self.send_wecom_message(title, content, is_success=False)
     
     def run(self):
