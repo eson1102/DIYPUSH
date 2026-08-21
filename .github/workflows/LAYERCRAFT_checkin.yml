@@ -1,11 +1,11 @@
-name: LayerCraft签到
+name: LayerCraft Auto Checkin
 
 on:
   schedule:
     # 每天 UTC 时间 00:00 运行（北京时间 08:00）
     - cron: '0 0 * * *'
-    # 可选：增加下午场，确保签到成功（如果上午失败，下午会重试）
-    # - cron: '0 12 * * *'
+    # 每天 UTC 时间 16:00 运行（北京时间 24:00）作为备用
+    - cron: '0 16 * * *'
   # 允许手动触发
   workflow_dispatch:
 
@@ -25,12 +25,22 @@ jobs:
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
-        pip install -r requirements.txt
+        pip install requests
     
-    - name: Run checkin script
+    - name: Run checkin script (Debug模式)
       env:
         LAYERCRAFT_EMAIL: ${{ secrets.LAYERCRAFT_EMAIL }}
         LAYERCRAFT_PASSWORD: ${{ secrets.LAYERCRAFT_PASSWORD }}
         WECOM_WEBHOOK: ${{ secrets.WECOM_WEBHOOK }}
+        DEBUG: ${{ secrets.DEBUG || 'true' }}  # 默认开启 Debug 模式
       run: python qiandao.py
-
+    
+    - name: Upload debug logs
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: checkin-logs
+        path: |
+          *.log
+          *.txt
+        retention-days: 7
