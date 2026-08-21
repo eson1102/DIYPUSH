@@ -2,6 +2,7 @@
 """
 Plume Vault 净值数据抓取脚本
 从 https://app.plume.org/vaults/nest-opal-vault 获取净值数据
+并发送企业微信通知
 """
 
 import json
@@ -29,6 +30,9 @@ class PlumeVaultTracker:
         self.today_file = os.path.join(self.data_dir, "today.json")
         self.history_file = os.path.join(self.data_dir, "history.json")
         self.daily_summary_file = os.path.join(self.data_dir, "daily_summary.json")
+        
+        # 企业微信机器人 Webhook（从环境变量读取）
+        self.wecom_webhook = os.environ.get('WECOM_WEBHOOK', '')
         
         # 确保数据目录存在
         os.makedirs(self.data_dir, exist_ok=True)
@@ -59,15 +63,15 @@ class PlumeVaultTracker:
             soup = BeautifulSoup(response.text, 'html.parser')
             
             data = {
-                'price': None,
-                'price_change': None,
-                'price_change_percent': None,
-                'apy': None,
+                'price': 0.0,
+                'price_change': 0.0,
+                'price_change_percent': 0.0,
+                'apy': 0.0,
                 'timestamp': datetime.utcnow().isoformat(),
                 'date': datetime.utcnow().strftime('%Y-%m-%d')
             }
             
-            # 方法1: 通过CSS类查找价格 - 使用更精确的选择器
+            # 方法1: 通过CSS类查找价格
             price_element = soup.find('p', class_=re.compile(r'css-1cz2y6m'))
             if price_element:
                 text = price_element.get_text(strip=True)
@@ -77,7 +81,7 @@ class PlumeVaultTracker:
                     logger.info(f"找到价格: ${price}")
             
             # 方法2: 查找包含$符号的文本
-            if not data['price']:
+            if data['price'] == 0.0:
                 all_text = soup.get_text()
                 price_pattern = r'\$(\d+\.\d{4})'
                 matches = re.findall(price_pattern, all_text)
@@ -85,7 +89,7 @@ class PlumeVaultTracker:
                     data['price'] = float(matches[0])
                     logger.info(f"通过正则找到价格: ${data['price']}")
             
-            # 提取价格变化和APY - 使用更精确的选择器
+            # 提取价格变化和APY
             change_element = soup.find('span', class_=re.compile(r'css-lbly53'))
             if change_element:
                 text = change_element.get_text(strip=True)
@@ -97,25 +101,29 @@ class PlumeVaultTracker:
                     sign = change_match.group(1)
                     value = float(change_match.group(2))
                     data['price_change'] = value if sign == '+' else -value
+                    logger.info(f"提取价格变化: {data['price_change']}")
                 
-                # 提取涨跌幅: 从文本中提取百分比
+                # 提取涨跌幅
                 percent_match = re.search(r'\(([\d.]+)%', text)
                 if percent_match:
                     data['price_change_percent'] = float(percent_match.group(1))
+                    logger.info(f"提取涨跌幅: {data['price_change_percent']}%")
                 
-                # 提取APY: 从文本中提取APY
+                # 提取APY
                 apy_match = re.search(r'([\d.]+)%\s*APY', text)
                 if apy_match:
                     data['apy'] = float(apy_match.group(1))
+                    logger.info(f"提取APY: {data['apy']}%")
                 
                 # 如果上面的没匹配到，尝试其他格式
-                if not data['apy']:
+                if data['apy'] == 0.0:
                     apy_match2 = re.search(r'([\d.]+)%APY', text)
                     if apy_match2:
                         data['apy'] = float(apy_match2.group(1))
+                        logger.info(f"提取APY(备用): {data['apy']}%")
             
             # 方法3: 从Vault APY区域获取数据
-            if not data['apy']:
+            if data['apy'] == 0.0:
                 apy_elements = soup.find_all('span', class_=re.compile(r'css-hukq4b'))
                 for el in apy_elements:
                     text = el.get_text(strip=True)
@@ -127,7 +135,7 @@ class PlumeVaultTracker:
                             break
             
             # 检查是否获取到有效数据
-            if data['price'] is None:
+            if data['price'] == 0.0:
                 logger.error("未能获取到价格数据")
                 return None
             
@@ -146,7 +154,6 @@ class PlumeVaultTracker:
         if not text:
             return None
         
-        # 匹配 $1.0882 格式
         match = re.search(r'\$(\d+\.\d+)', text)
         if match:
             return float(match.group(1))
@@ -221,177 +228,76 @@ class PlumeVaultTracker:
         
         return None
     
-    def generate_comparison(self, today_data: Dict) -> Optional[Dict]:
-        """生成今天和昨天的对比"""
-        if not today_data:
-            return None
-        
-        yesterday_data = self.get_previous_day_data(today_data['date'])
-        
-        comparison = {
-            'today': today_data,
-            'yesterday': yesterday_data,
-            'comparison': {
-                'price_change_24h': None,
-                'price_change_percent_24h': None,
-                'apy_change': None,
-                'apy_change_percent': None
-            }
-        }
-        
-        if yesterday_data:
-            today_price = today_data.get('price', 0) or 0
-            yesterday_price = yesterday_data.get('price', 0) or 0
-            
-            if yesterday_price > 0:
-                price_diff = today_price - yesterday_price
-                comparison['comparison']['price_change_24h'] = round(price_diff, 6)
-                comparison['comparison']['price_change_percent_24h'] = round(
-                    (price_diff / yesterday_price) * 100, 2
-                )
-            
-            today_apy = today_data.get('apy', 0) or 0
-            yesterday_apy = yesterday_data.get('apy', 0) or 0
-            if yesterday_apy > 0:
-                comparison['comparison']['apy_change'] = round(today_apy - yesterday_apy, 2)
-                comparison['comparison']['apy_change_percent'] = round(
-                    ((today_apy - yesterday_apy) / yesterday_apy) * 100, 2
-                )
-        
-        # 保存对比报告
-        summary = {
-            'date': today_data['date'],
-            'timestamp': datetime.utcnow().isoformat(),
-            'comparison': comparison['comparison'],
-            'today': {
-                'price': today_data.get('price', 0),
-                'apy': today_data.get('apy', 0),
-                'price_change': today_data.get('price_change', 0),
-                'price_change_percent': today_data.get('price_change_percent', 0)
-            },
-            'yesterday': {
-                'price': yesterday_data.get('price', 0) if yesterday_data else None,
-                'apy': yesterday_data.get('apy', 0) if yesterday_data else None
-            }
-        }
-        
-        # 保存每日摘要
-        try:
-            daily_summaries = []
-            if os.path.exists(self.daily_summary_file):
-                with open(self.daily_summary_file, 'r') as f:
-                    daily_summaries = json.load(f)
-            
-            existing_index = None
-            for i, s in enumerate(daily_summaries):
-                if s.get('date') == today_data['date']:
-                    existing_index = i
-                    break
-            
-            if existing_index is not None:
-                daily_summaries[existing_index] = summary
-            else:
-                daily_summaries.append(summary)
-            
-            daily_summaries.sort(key=lambda x: x.get('date', ''))
-            
-            with open(self.daily_summary_file, 'w') as f:
-                json.dump(daily_summaries, f, indent=2)
-                
-        except Exception as e:
-            logger.error(f"保存每日摘要失败: {e}")
-        
-        return comparison
-    
-    def print_comparison(self, comparison: Dict):
-        """打印对比结果"""
-        if not comparison:
-            print("\n❌ 无对比数据")
+    def send_wecom_notification(self, data: Dict):
+        """发送企业微信通知"""
+        if not self.wecom_webhook:
+            logger.warning("未配置企业微信 Webhook，跳过通知")
             return
         
-        today = comparison.get('today', {})
-        yesterday = comparison.get('yesterday')
-        comp = comparison.get('comparison', {})
-        
-        print("\n" + "="*60)
-        print(f"📊 Plume Vault 净值对比 - {today.get('date', 'Unknown')}")
-        print("="*60)
-        
-        print(f"\n💰 当前净值: ${today.get('price', 0):.4f}")
-        if yesterday:
-            print(f"📉 昨日净值: ${yesterday.get('price', 0):.4f}")
-            print(f"📈 24小时变化: ${comp.get('price_change_24h', 0):+.6f}")
-            print(f"📊 24小时涨跌幅: {comp.get('price_change_percent_24h', 0):+.2f}%")
-        else:
-            print("📉 昨日数据: 暂无")
-        
-        print(f"\n🏦 当前 APY: {today.get('apy', 0):.2f}%")
-        if yesterday and yesterday.get('apy'):
-            print(f"📉 昨日 APY: {yesterday.get('apy', 0):.2f}%")
-            print(f"📊 APY 变化: {comp.get('apy_change', 0):+.2f}%")
-        
-        print("\n" + "="*60)
-        
-        self.save_markdown_report(comparison)
-    
-    def save_markdown_report(self, comparison: Dict):
-        """保存Markdown格式的报告"""
-        today = comparison.get('today', {})
-        yesterday = comparison.get('yesterday')
-        comp = comparison.get('comparison', {})
-        date = today.get('date', 'unknown')
-        
-        # 安全获取数据，确保所有值都是数字
-        today_price = today.get('price', 0)
-        if today_price is None:
-            today_price = 0
-        today_apy = today.get('apy', 0)
-        if today_apy is None:
-            today_apy = 0
-        
-        yesterday_price = 0
-        yesterday_apy = 0
-        if yesterday:
-            yesterday_price = yesterday.get('price', 0)
-            if yesterday_price is None:
-                yesterday_price = 0
-            yesterday_apy = yesterday.get('apy', 0)
-            if yesterday_apy is None:
-                yesterday_apy = 0
-        
-        price_change = comp.get('price_change_24h', 0)
-        if price_change is None:
-            price_change = 0
-        price_change_percent = comp.get('price_change_percent_24h', 0)
-        if price_change_percent is None:
-            price_change_percent = 0
-        apy_change = comp.get('apy_change', 0)
-        if apy_change is None:
-            apy_change = 0
-        
-        lines = [
-            f"# Plume Vault 净值报告 - {date}",
-            "",
-            "## 📊 数据概览",
-            "",
-            "| 指标 | 今日 | 昨日 | 变化 |",
-            "|------|------|------|------|",
-            f"| 净值 | ${today_price:.4f} | ${yesterday_price:.4f} | ${price_change:+.6f} ({price_change_percent:+.2f}%) |",
-            f"| APY | {today_apy:.2f}% | {yesterday_apy:.2f}% | {apy_change:+.2f}% |",
-            "",
-            f"📅 更新时间: {datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S UTC')}",
-            "",
-            "---",
-            "*数据来源: https://app.plume.org/vaults/nest-opal-vault*"
-        ]
-        
-        markdown_file = os.path.join(self.data_dir, f"report_{date}.md")
         try:
-            with open(markdown_file, 'w', encoding='utf-8') as f:
-                f.write('\n'.join(lines))
-            logger.info(f"已保存Markdown报告: {markdown_file}")
+            # 获取前一天数据用于对比
+            yesterday_data = self.get_previous_day_data(data['date'])
+            
+            # 计算24小时变化
+            price_change_24h = 0.0
+            price_change_percent_24h = 0.0
+            apy_change = 0.0
+            
+            if yesterday_data:
+                yesterday_price = yesterday_data.get('price', 0)
+                if yesterday_price > 0:
+                    price_change_24h = data['price'] - yesterday_price
+                    price_change_percent_24h = (price_change_24h / yesterday_price) * 100
+                
+                yesterday_apy = yesterday_data.get('apy', 0)
+                if yesterday_apy > 0:
+                    apy_change = data['apy'] - yesterday_apy
+            
+            # 判断趋势
+            if price_change_percent_24h > 0:
+                trend = "上涨 📈"
+            elif price_change_percent_24h == 0:
+                trend = "持平 ➡️"
+            else:
+                trend = "下跌 📉"
+            
+            # 构建消息（使用 f-string 正确格式化）
+            message = f"""【Plume Vault 净值更新】
+
+更新日期: {data['date']}
+
+当前净值: ${data['price']:.4f}
+当前 APY: {data['apy']:.2f}%
+
+价格变化: {trend}
+  24小时变化: ${price_change_24h:+.6f}
+  24小时涨跌幅: {price_change_percent_24h:+.2f}%
+
+更新时间: {datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S UTC')}
+查看详情: https://github.com/eson1102/DIYPUSH/actions"""
+            
+            # 发送到企业微信
+            payload = {
+                "msgtype": "text",
+                "text": {
+                    "content": message
+                }
+            }
+            
+            response = requests.post(
+                self.wecom_webhook,
+                headers={"Content-Type": "application/json"},
+                json=payload,
+                timeout=10
+            )
+            
+            if response.status_code == 200:
+                logger.info("✅ 企业微信通知发送成功")
+            else:
+                logger.error(f"企业微信通知发送失败: {response.status_code} - {response.text}")
+                
         except Exception as e:
-            logger.error(f"保存Markdown报告失败: {e}")
+            logger.error(f"发送企业微信通知异常: {e}")
 
 def main():
     """主函数"""
@@ -404,14 +310,12 @@ def main():
         logger.error("获取数据失败")
         exit(1)
     
+    # 保存数据
     tracker.save_today_data(data)
     tracker.update_history(data)
-    comparison = tracker.generate_comparison(data)
     
-    if comparison:
-        tracker.print_comparison(comparison)
-    else:
-        logger.warning("无法生成对比数据")
+    # 发送企业微信通知
+    tracker.send_wecom_notification(data)
     
     logger.info("数据获取完成！")
 
