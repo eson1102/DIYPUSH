@@ -2,8 +2,9 @@ name: 每日自动签到
 
 on:
   schedule:
-    - cron: '0 0 * * *'  # 每天UTC 0:00 (北京时间8:00)
-  workflow_dispatch:
+    # 每天北京时间早上8点运行（UTC时间0点）
+    - cron: '0 0 * * *'
+  workflow_dispatch:  # 允许手动触发
 
 jobs:
   checkin:
@@ -19,10 +20,12 @@ jobs:
           python-version: '3.9'
       
       - name: 安装依赖
-        run: pip install requests
+        run: |
+          pip install requests
       
       - name: 运行签到脚本
         env:
           EMAIL: ${{ secrets.EMAIL }}
           PASSWORD: ${{ secrets.PASSWORD }}
+          WECOM_WEBHOOK: ${{ secrets.WECOM_WEBHOOK }}
         run: python Mindvideo_checkin.py
