@@ -1,14 +1,14 @@
-name: Mindvideo每日自动签到
+name: 每日自动签到
 
 on:
   schedule:
-    # 每天北京时间早上8点运行（UTC时间0点）
-    - cron: '0 0 * * *'
-  workflow_dispatch: # 允许你手动触发
+    - cron: '0 0 * * *'  # 每天UTC 0:00 (北京时间8:00)
+  workflow_dispatch:
 
 jobs:
   checkin:
     runs-on: ubuntu-latest
+    
     steps:
       - name: 检出代码
         uses: actions/checkout@v3
@@ -19,9 +19,10 @@ jobs:
           python-version: '3.9'
       
       - name: 安装依赖
-        run: pip install -r requirements.txt
+        run: pip install requests
       
       - name: 运行签到脚本
         env:
-          TOKEN: ${{ secrets.TOKEN }}
+          EMAIL: ${{ secrets.EMAIL }}
+          PASSWORD: ${{ secrets.PASSWORD }}
         run: python Mindvideo_checkin.py
