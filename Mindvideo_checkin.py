@@ -14,6 +14,7 @@ class MindVideoAutoCheckin:
         # API地址
         self.login_url = "https://api-app.mindvideo.ai/api/login"
         self.checkin_url = "https://api-app.mindvideo.ai/api/checkin"
+        self.credits_url = "https://api-app.mindvideo.ai/api/user/credits/stats"
         
         # 基础请求头
         self.base_headers = {
@@ -32,6 +33,10 @@ class MindVideoAutoCheckin:
             "message": "",
             "points": 0,
             "continuity": 0,
+            "total_credits": 0,
+            "used_credits": 0,
+            "remaining_credits": 0,
+            "subscription_type": "Free",
             "timestamp": datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         }
         
@@ -148,6 +153,57 @@ class MindVideoAutoCheckin:
             self.checkin_result["message"] = error_msg
             return False
     
+    def get_credits_stats(self):
+        """获取积分统计信息"""
+        if not self.token:
+            print("❌ 未获取到Token，无法查询积分")
+            return False
+        
+        print("🔄 正在查询积分信息...")
+        
+        headers = self.base_headers.copy()
+        headers["authorization"] = self.token
+        
+        try:
+            response = requests.get(
+                self.credits_url,
+                headers=headers,
+                timeout=30
+            )
+            
+            if response.status_code == 200:
+                result = response.json()
+                
+                if result.get('code') == 0 and 'data' in result:
+                    data = result['data']
+                    
+                    # 提取总积分信息
+                    total_info = data.get('total', {})
+                    self.checkin_result["total_credits"] = int(total_info.get('total_credits', 0))
+                    self.checkin_result["used_credits"] = int(total_info.get('used_credits', 0))
+                    self.checkin_result["remaining_credits"] = int(total_info.get('remaining_credits', 0))
+                    
+                    # 提取订阅类型
+                    self.checkin_result["subscription_type"] = data.get('subscription_type', 'Free')
+                    
+                    print(f"✅ 积分查询成功")
+                    print(f"📊 总积分: {self.checkin_result['total_credits']}")
+                    print(f"📊 已用积分: {self.checkin_result['used_credits']}")
+                    print(f"📊 剩余积分: {self.checkin_result['remaining_credits']}")
+                    print(f"📊 订阅类型: {self.checkin_result['subscription_type']}")
+                    
+                    return True
+                else:
+                    print(f"⚠️ 积分查询响应异常: {json.dumps(result, ensure_ascii=False)}")
+                    return False
+            else:
+                print(f"⚠️ 积分查询失败，状态码: {response.status_code}")
+                return False
+                
+        except Exception as e:
+            print(f"⚠️ 积分查询异常: {e}")
+            return False
+    
     def checkin(self):
         """执行签到"""
         if not self.token:
@@ -187,7 +243,7 @@ class MindVideoAutoCheckin:
                         
                         msg_parts = []
                         if 'points' in data:
-                            msg_parts.append(f"💎 当前积分：{data['points']}")
+                            msg_parts.append(f"💎 本次获得积分：+{data['points']}")
                         if 'continuity' in data:
                             msg_parts.append(f"📅 连续签到：{data['continuity']}天")
                         if 'message' in data:
@@ -234,11 +290,21 @@ class MindVideoAutoCheckin:
         """发送通知（根据签到结果）"""
         if self.checkin_result["success"]:
             title = "MindVideo 签到成功 🎉"
+            
+            # 构建积分信息
+            credit_info = ""
+            if self.checkin_result["total_credits"] > 0:
+                credit_info = f"""
+💳 积分详情：
+  • 总积分：{self.checkin_result['total_credits']}
+  • 已用积分：{self.checkin_result['used_credits']}
+  • 剩余积分：{self.checkin_result['remaining_credits']}
+  • 订阅类型：{self.checkin_result['subscription_type']}"""
+            
             content = f"""
 {self.checkin_result['message']}
-
-💎 积分：{self.checkin_result.get('points', 'N/A')}
-📅 连续签到：{self.checkin_result.get('continuity', 'N/A')}天"""
+{credit_info}"""
+            
             return self.send_wecom_message(title, content, is_success=True)
         else:
             title = "MindVideo 签到失败 ⚠️"
@@ -267,14 +333,24 @@ class MindVideoAutoCheckin:
         print("-" * 60)
         
         # 2. 执行签到
-        if self.checkin():
-            print("🎉 签到流程完成！")
-            self.send_notification()
-            return True
-        else:
+        if not self.checkin():
             print("❌ 签到流程失败")
             self.send_notification()
             return False
+        
+        print("-" * 60)
+        
+        # 3. 查询积分信息
+        self.get_credits_stats()
+        
+        print("-" * 60)
+        
+        # 4. 发送通知
+        print("📤 发送通知...")
+        self.send_notification()
+        
+        print("🎉 签到流程完成！")
+        return True
 
 if __name__ == "__main__":
     checker = MindVideoAutoCheckin()
