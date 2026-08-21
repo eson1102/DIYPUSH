@@ -350,9 +350,9 @@ def main():
     # 构建推送消息
     now = datetime.now(BEIJING_TZ)
     msg_lines = []
-    msg_lines.append("=" * 50)
+    msg_lines.append("=" * 20)
     msg_lines.append("🎮 LayerCraft 签到结果")
-    msg_lines.append("=" * 50)
+    msg_lines.append("=" * 20)
     msg_lines.append(f"签到时间: {now.strftime('%Y年%m月%d日 %H:%M:%S')}")
     msg_lines.append(f"用户账号: {email}")
     msg_lines.append("")
@@ -370,9 +370,9 @@ def main():
         msg_lines.append(f"失败原因: {result.get('message', '未知错误')}")
     
     msg_lines.append("")
-    msg_lines.append("-" * 50)
+    msg_lines.append("-" * 20)
     msg_lines.append(f"推送时间: {now.strftime('%Y年%m月%d日 %H:%M:%S')}")
-    msg_lines.append("=" * 50)
+    msg_lines.append("=" * 20)
     
     final_message = "\n".join(msg_lines)
     print(final_message)
