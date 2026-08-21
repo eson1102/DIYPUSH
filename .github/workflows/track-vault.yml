@@ -2,7 +2,7 @@ name: Track Plume Vault Net Value
 
 on:
   schedule:
-    - cron: '0 0,6,12,18 * * *'
+    - cron: '0 6,18 * * *'
   workflow_dispatch:
 
 jobs:
@@ -27,7 +27,9 @@ jobs:
         run: |
           pip install -r requirements.txt
           
-      - name: Fetch vault data
+      - name: Fetch vault data and send notification
+        env:
+          WECOM_WEBHOOK: ${{ secrets.WECOM_WEBHOOK }}
         run: |
           python scripts/fetch_vault_data.py
           
@@ -38,35 +40,3 @@ jobs:
           git add data/
           git diff --staged --quiet || git commit -m "Update vault data [skip ci]"
           git push
-          
-      - name: Send WeCom notification
-        if: always()
-        run: |
-          WEBHOOK_URL="https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=e75ac7b2-f7e7-45a5-a7b8-0f92390ab020"
-          
-          # 构建消息内容
-          if [ -f data/today.json ]; then
-            PRICE=$(jq -r '.price' data/today.json)
-            APY=$(jq -r '.apy' data/today.json)
-            PRICE_CHANGE=$(jq -r '.price_change' data/today.json)
-            PRICE_CHANGE_PERCENT=$(jq -r '.price_change_percent' data/today.json)
-            DATE=$(jq -r '.date' data/today.json)
-            
-            if (( $(echo "$PRICE_CHANGE_PERCENT > 0" | bc -l) )); then
-              TREND="上涨 📈"
-            elif (( $(echo "$PRICE_CHANGE_PERCENT == 0" | bc -l) )); then
-              TREND="持平 ➡️"
-            else
-              TREND="下跌 📉"
-            fi
-            
-            # 使用 echo 构建多行消息
-            MESSAGE=$(echo -e "【Plume Vault 净值更新】\n\n更新日期: $DATE\n\n当前净值: $${PRICE}\n当前 APY: ${APY}%\n\n价格变化: ${TREND}\n  变化金额: +$${PRICE_CHANGE}\n  涨跌幅: ${PRICE_CHANGE_PERCENT}%\n\n更新时间: $(date '+%Y-%m-%d %H:%M:%S UTC')\n查看详情: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}")
-          else
-            MESSAGE=$(echo -e "【Plume Vault 数据获取失败】\n\n未能获取到 Vault 数据，请检查脚本运行情况。\n查看详情: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}")
-          fi
-          
-          # 发送到企业微信
-          curl -X POST "$WEBHOOK_URL" \
-            -H "Content-Type: application/json" \
-            -d "{\"msgtype\":\"text\",\"text\":{\"content\":\"$MESSAGE\"}}"
