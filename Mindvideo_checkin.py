@@ -2,7 +2,6 @@ import os
 import requests
 import json
 import hashlib
-import time
 from datetime import datetime
 
 class MindVideoAutoCheckin:
@@ -10,6 +9,7 @@ class MindVideoAutoCheckin:
         # 从环境变量读取账号密码
         self.email = os.environ.get('EMAIL')
         self.password = os.environ.get('PASSWORD')  # 明文密码
+        self.webhook_url = os.environ.get('WECOM_WEBHOOK')  # 企业微信机器人webhook
         
         # API地址
         self.login_url = "https://api-app.mindvideo.ai/api/login"
@@ -27,16 +27,80 @@ class MindVideoAutoCheckin:
         }
         
         self.token = None
+        self.checkin_result = {
+            "success": False,
+            "message": "",
+            "points": 0,
+            "continuity": 0,
+            "timestamp": datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        }
         
     def md5_encrypt(self, text):
         """MD5加密"""
         return hashlib.md5(text.encode('utf-8')).hexdigest()
     
+    def send_wecom_message(self, title, content, is_success=True):
+        """发送企业微信机器人消息"""
+        if not self.webhook_url:
+            print("⚠️ 未设置企业微信Webhook，跳过通知")
+            return False
+        
+        try:
+            # 构建Markdown消息
+            if is_success:
+                color = "info"
+                emoji = "✅"
+            else:
+                color = "warning"
+                emoji = "❌"
+            
+            markdown_content = f"""## {emoji} {title}
+
+> **时间**: {self.checkin_result['timestamp']}
+> **状态**: {'成功' if is_success else '失败'}
+
+{content}
+
+---
+<font color="comment">MindVideo 自动签到系统</font>"""
+            
+            # 企业微信机器人消息格式
+            message = {
+                "msgtype": "markdown",
+                "markdown": {
+                    "content": markdown_content
+                }
+            }
+            
+            response = requests.post(
+                self.webhook_url,
+                json=message,
+                headers={"Content-Type": "application/json"},
+                timeout=10
+            )
+            
+            if response.status_code == 200:
+                result = response.json()
+                if result.get('errcode') == 0:
+                    print("✅ 企业微信通知发送成功")
+                    return True
+                else:
+                    print(f"⚠️ 企业微信通知发送失败: {result}")
+                    return False
+            else:
+                print(f"⚠️ 企业微信通知发送失败，状态码: {response.status_code}")
+                return False
+                
+        except Exception as e:
+            print(f"⚠️ 发送企业微信通知异常: {e}")
+            return False
+    
     def login(self):
         """自动登录获取Token"""
         if not self.email or not self.password:
-            print("❌ 错误：未设置账号密码环境变量")
-            print("请在GitHub Secrets中设置 EMAIL 和 PASSWORD")
+            error_msg = "❌ 错误：未设置账号密码环境变量"
+            print(error_msg)
+            self.checkin_result["message"] = error_msg
             return False
             
         print(f"🔄 正在登录账号: {self.email}")
@@ -50,68 +114,55 @@ class MindVideoAutoCheckin:
             "password": encrypted_password
         }
         
-        # 复制基础headers并添加特定headers
-        headers = self.base_headers.copy()
-        # 注意：i-sign 可能每次都需要从服务器获取，这里先尝试不使用
-        # 如果登录失败，可能需要额外处理 i-sign
-        
         try:
-            print(f"📤 发送登录请求...")
             response = requests.post(
                 self.login_url, 
                 json=login_data, 
-                headers=headers, 
+                headers=self.base_headers, 
                 timeout=30
             )
             
-            print(f"📥 登录响应状态码: {response.status_code}")
-            
             if response.status_code == 200:
                 result = response.json()
-                print(f"📊 登录响应: {json.dumps(result, ensure_ascii=False, indent=2)}")
                 
-                # 根据实际响应提取Token
-                # 尝试多种可能的字段路径
+                # 提取Token
                 token = None
                 if 'data' in result and result['data']:
-                    if 'token' in result['data']:
-                        token = result['data']['token']
-                    elif 'access_token' in result['data']:
-                        token = result['data']['access_token']
-                elif 'token' in result:
-                    token = result['token']
-                elif 'access_token' in result:
-                    token = result['access_token']
+                    token = result['data'].get('token')
+                if not token:
+                    token = result.get('token')
                 
                 if token:
-                    # 确保Token格式正确
                     if not token.startswith('Bearer '):
                         self.token = f'Bearer {token}'
                     else:
                         self.token = token
                     
-                    print(f"✅ 登录成功！Token已获取")
-                    print(f"🔑 Token预览: {self.token[:50]}...")
+                    print(f"✅ 登录成功！")
                     return True
                 else:
-                    print("⚠️ 未找到Token字段")
-                    print(f"响应中的字段: {list(result.keys())}")
+                    error_msg = f"登录响应中未找到Token: {json.dumps(result, ensure_ascii=False)}"
+                    print(f"⚠️ {error_msg}")
+                    self.checkin_result["message"] = error_msg
                     return False
             else:
-                print(f"❌ 登录失败，状态码: {response.status_code}")
-                print(f"返回内容: {response.text}")
+                error_msg = f"登录失败，状态码: {response.status_code}"
+                print(f"❌ {error_msg}")
+                self.checkin_result["message"] = error_msg
                 return False
                 
         except Exception as e:
-            print(f"❌ 登录异常: {e}")
-            import traceback
-            traceback.print_exc()
+            error_msg = f"登录异常: {str(e)}"
+            print(f"❌ {error_msg}")
+            self.checkin_result["message"] = error_msg
             return False
     
     def checkin(self):
         """执行签到"""
         if not self.token:
-            print("❌ 未获取到Token，请先登录")
+            error_msg = "未获取到Token，请先登录"
+            print(f"❌ {error_msg}")
+            self.checkin_result["message"] = error_msg
             return False
         
         print("🔄 正在执行签到...")
@@ -126,41 +177,78 @@ class MindVideoAutoCheckin:
                 timeout=30
             )
             
-            print(f"📥 签到响应状态码: {response.status_code}")
-            
             if response.status_code == 200:
                 result = response.json()
                 print(f"✅ 签到成功！")
                 print(f"📊 返回数据: {json.dumps(result, ensure_ascii=False, indent=2)}")
                 
                 # 解析返回的数据
+                self.checkin_result["success"] = True
+                
                 if 'data' in result and result['data']:
                     data = result['data']
+                    self.checkin_result["points"] = data.get('points', 0)
+                    self.checkin_result["continuity"] = data.get('continuity', 0)
+                    
+                    # 构建成功消息
+                    msg_parts = []
                     if 'points' in data:
-                        print(f"💎 当前积分: {data['points']}")
+                        msg_parts.append(f"💎 当前积分: {data['points']}")
                     if 'continuity' in data:
-                        print(f"📅 连续签到: {data['continuity']}天")
+                        msg_parts.append(f"📅 连续签到: {data['continuity']}天")
                     if 'message' in data:
-                        print(f"📝 消息: {data['message']}")
+                        msg_parts.append(f"📝 消息: {data['message']}")
+                    
+                    self.checkin_result["message"] = "\n".join(msg_parts) if msg_parts else "签到成功"
                 elif 'message' in result:
-                    print(f"📝 消息: {result['message']}")
+                    self.checkin_result["message"] = result['message']
+                else:
+                    self.checkin_result["message"] = "签到成功"
                 
                 return True
             else:
-                print(f"❌ 签到失败，状态码: {response.status_code}")
-                print(f"返回内容: {response.text}")
+                error_msg = f"签到失败，状态码: {response.status_code}"
+                print(f"❌ {error_msg}")
+                self.checkin_result["message"] = error_msg
                 
-                # 如果返回401，说明Token过期
                 if response.status_code == 401:
-                    print("⚠️ Token已过期，需要重新登录")
-                    return False
+                    self.checkin_result["message"] = "Token已过期，需要重新登录"
+                    print("⚠️ Token已过期")
+                
                 return False
                 
         except Exception as e:
-            print(f"❌ 签到异常: {e}")
-            import traceback
-            traceback.print_exc()
+            error_msg = f"签到异常: {str(e)}"
+            print(f"❌ {error_msg}")
+            self.checkin_result["message"] = error_msg
             return False
+    
+    def send_notification(self):
+        """发送通知（根据签到结果）"""
+        if self.checkin_result["success"]:
+            title = "MindVideo 签到成功 🎉"
+            content = f"""
+{self.checkin_result['message']}
+
+**邮箱**: {self.email}
+**积分**: {self.checkin_result.get('points', 'N/A')}
+**连续签到**: {self.checkin_result.get('continuity', 'N/A')}天
+"""
+            return self.send_wecom_message(title, content, is_success=True)
+        else:
+            title = "MindVideo 签到失败 ⚠️"
+            content = f"""
+**错误信息**: {self.checkin_result['message']}
+
+**邮箱**: {self.email}
+**时间**: {self.checkin_result['timestamp']}
+
+请检查:
+1. 账号密码是否正确
+2. 网络是否正常
+3. Token是否过期
+"""
+            return self.send_wecom_message(title, content, is_success=False)
     
     def run(self):
         """主流程"""
@@ -172,6 +260,7 @@ class MindVideoAutoCheckin:
         # 1. 登录获取Token
         if not self.login():
             print("❌ 登录失败，签到流程终止")
+            self.send_notification()  # 发送失败通知
             return False
         
         print("-" * 60)
@@ -179,9 +268,11 @@ class MindVideoAutoCheckin:
         # 2. 执行签到
         if self.checkin():
             print("🎉 签到流程完成！")
+            self.send_notification()  # 发送成功通知
             return True
         else:
             print("❌ 签到流程失败")
+            self.send_notification()  # 发送失败通知
             return False
 
 if __name__ == "__main__":
