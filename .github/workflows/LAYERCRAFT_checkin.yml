@@ -32,12 +32,5 @@ jobs:
         LAYERCRAFT_EMAIL: ${{ secrets.LAYERCRAFT_EMAIL }}
         LAYERCRAFT_PASSWORD: ${{ secrets.LAYERCRAFT_PASSWORD }}
         WECOM_WEBHOOK: ${{ secrets.WECOM_WEBHOOK }}
-      run: python src/checkin.py
-    
-    - name: Upload checkin log
-      if: always()
-      uses: actions/upload-artifact@v4
-      with:
-        name: checkin-logs
-        path: logs/
-        retention-days: 7
+      run: python qiandao.py
+
