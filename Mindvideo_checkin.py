@@ -3,6 +3,7 @@ import requests
 import json
 import hashlib
 from datetime import datetime
+import pytz  # 添加时区库
 
 class MindVideoAutoCheckin:
     def __init__(self):
@@ -37,8 +38,21 @@ class MindVideoAutoCheckin:
             "used_credits": 0,
             "remaining_credits": 0,
             "subscription_type": "Free",
-            "timestamp": datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            "timestamp": self.get_beijing_time()  # 使用北京时间
         }
+    
+    def get_beijing_time(self):
+        """获取北京时间 (UTC+8)"""
+        try:
+            # 尝试使用pytz
+            beijing_tz = pytz.timezone('Asia/Shanghai')
+            beijing_time = datetime.now(beijing_tz)
+            return beijing_time.strftime('%Y-%m-%d %H:%M:%S')
+        except:
+            # 如果pytz未安装，手动加8小时
+            utc_now = datetime.utcnow()
+            beijing_time = utc_now + timedelta(hours=8)
+            return beijing_time.strftime('%Y-%m-%d %H:%M:%S')
         
     def md5_encrypt(self, text):
         """MD5加密"""
@@ -56,9 +70,12 @@ class MindVideoAutoCheckin:
             else:
                 status_emoji = "❌"
             
+            # 更新时间为北京时间
+            current_time = self.get_beijing_time()
+            
             full_text = f"""【{status_emoji} {title}】
 ━━━━━━━━━━━━━━━━━━━━
-📅 时间：{self.checkin_result['timestamp']}
+📅 时间：{current_time}
 📧 账号：{self.email}
 📊 状态：{'成功 ✅' if is_success else '失败 ❌'}
 {content}
@@ -319,9 +336,10 @@ class MindVideoAutoCheckin:
     
     def run(self):
         """主流程"""
+        current_time = self.get_beijing_time()
         print("=" * 60)
         print(f"🚀 MindVideo自动签到系统启动")
-        print(f"⏰ 当前时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+        print(f"⏰ 当前时间: {current_time} (北京时间)")
         print("=" * 60)
         
         # 1. 登录获取Token
