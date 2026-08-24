@@ -337,10 +337,10 @@ class MindVideoAutoCheckin:
     def run(self):
         """主流程"""
         current_time = self.get_beijing_time()
-        print("=" * 60)
+        print("=" * 20)
         print(f"🚀 MindVideo自动签到系统启动")
         print(f"⏰ 当前时间: {current_time} (北京时间)")
-        print("=" * 60)
+        print("=" * 20)
         
         # 1. 登录获取Token
         if not self.login():
@@ -348,7 +348,7 @@ class MindVideoAutoCheckin:
             self.send_notification()
             return False
         
-        print("-" * 60)
+        print("-" * 20)
         
         # 2. 执行签到
         if not self.checkin():
@@ -356,12 +356,12 @@ class MindVideoAutoCheckin:
             self.send_notification()
             return False
         
-        print("-" * 60)
+        print("-" * 20)
         
         # 3. 查询积分信息
         self.get_credits_stats()
         
-        print("-" * 60)
+        print("-" * 20)
         
         # 4. 发送通知
         print("📤 发送通知...")
