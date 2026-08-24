@@ -350,7 +350,6 @@ def main():
     # 构建推送消息
     now = datetime.now(BEIJING_TZ)
     msg_lines = []
-    msg_lines.append("=" * 20)
     msg_lines.append("🎮 LayerCraft 签到结果")
     msg_lines.append("=" * 20)
     msg_lines.append(f"签到时间: {now.strftime('%Y年%m月%d日 %H:%M:%S')}")
