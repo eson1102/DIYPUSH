@@ -74,12 +74,12 @@ class MindVideoAutoCheckin:
             current_time = self.get_beijing_time()
             
             full_text = f"""【{status_emoji} {title}】
-━━━━━━━━━━━━━━━━━━━━
+
 📅 时间：{current_time}
 📧 账号：{self.email}
 📊 状态：{'成功 ✅' if is_success else '失败 ❌'}
 {content}
-━━━━━━━━━━━━━━━━━━━━
+
 🤖 MindVideo 自动签到系统"""
             
             message = {
