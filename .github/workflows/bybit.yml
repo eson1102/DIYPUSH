@@ -1,0 +1,38 @@
+name: Bybit NAV Monitor
+
+on:
+  schedule:
+    # 每天 UTC 时间 01:00, 09:00, 17:00 运行
+    # 相当于北京时间 09:00, 17:00, 次日01:00
+    - cron: '0 1,9,17 * * *'
+  workflow_dispatch:  # 支持手动触发
+
+jobs:
+  monitor:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.10'
+        
+    - name: Install dependencies
+      run: |
+        pip install -r requirements.txt
+        
+    - name: Run NAV monitor
+      env:
+        WEWORK_WEBHOOK: ${{ secrets.WEWORK_WEBHOOK }}
+      run: |
+        python bybit.py
+        
+    - name: Upload NAV data as artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: nav-data
+        path: nav_data.json
+        retention-days: 30
