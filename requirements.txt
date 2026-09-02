@@ -10,3 +10,4 @@ pandas>=2.0.0
 requests>=2.31.0
 numpy>=1.24.0
 lxml==4.9.3
+pybit==5.16.0
