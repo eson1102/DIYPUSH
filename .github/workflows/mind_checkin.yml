@@ -23,4 +23,4 @@ jobs:
         env:
           ACCOUNTS: ${{ secrets.ACCOUNTS }}
           WECOM_WEBHOOK: ${{ secrets.WECOM_WEBHOOK }}
-        run: python checkin.py
+        run: python Mindvideo_checkin.py
