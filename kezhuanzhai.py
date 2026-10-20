@@ -6,7 +6,7 @@ import os
 from datetime import datetime, timedelta
 
 # ==================== 配置区 ====================
-WEBHOOK_URL = os.environ.get('WECOM_WEBHOOK', '')
+WECOM_WEBHOOK = os.environ.get('WECOM_WEBHOOK', '')
 
 # ==================== 核心函数 ====================
 
@@ -156,8 +156,8 @@ def format_text_message(df):
 
 def send_to_wechat(message):
     """发送消息到企业微信机器人"""
-    if not WEBHOOK_URL:
-        print("❌ 未设置 WEBHOOK_URL 环境变量")
+    if not WECOM_WEBHOOK:
+        print("❌ 未设置 WECOM_WEBHOOK 环境变量")
         return False
     
     headers = {'Content-Type': 'application/json'}
@@ -169,7 +169,7 @@ def send_to_wechat(message):
     }
     
     try:
-        response = requests.post(WEBHOOK_URL, headers=headers, json=data, timeout=30)
+        response = requests.post(WECOM_WEBHOOK, headers=headers, json=data, timeout=30)
         if response.status_code == 200:
             result = response.json()
             if result.get('errcode') == 0:
